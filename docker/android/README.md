@@ -43,3 +43,12 @@ TrueNAS bewaart en start de compose-YAML zelf. Daarom werkt `docker compose --pr
 7. **Afstellen.** Vindt hij niets, dan toont de scanlog één keer de zichtbare teksten met hun resource-id. Pas daarmee in de instellingen *Titel-id* en *Artiest-id* aan. Opent het luisterscherm niet, pas dan *Intent* aan.
 
 **Beveiliging:** poort 5555 (ADB) geeft volledige controle over de emulator. Open hem alleen tijdens het inloggen, of alleen op je LAN. Setscout zelf praat met de emulator via het interne compose-netwerk (`android:5555`, `android:4713`).
+
+## Problemen
+
+| Symptoom in de log van `android` | Oplossing |
+|---|---|
+| `Segmentation fault … emulator` (vaak bij Play Store/Chrome) | Opgelost in het startscript (Vulkan uit). Bouw `setscout-android:latest` opnieuw (stap 2) |
+| `Daemon startup failed` (pulseaudio) in een lus | Opgelost: het startscript ruimt oude PulseAudio-bestanden op. Opnieuw bouwen (stap 2) |
+| `Could not init 'pa' audio driver` | De virtuele microfoon werkt dan niet. Het startscript start de emulator nu zonder `-no-window` (Qt "offscreen"), want alleen die variant heeft PulseAudio |
+| Emulator start niet meer na de update | Zet bij `android` de environment-variabele `EMULATOR_WINDOW: none` (oude headless-modus, zonder microfoon) en meld het |
