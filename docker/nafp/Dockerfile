@@ -30,19 +30,9 @@ RUN curl -fsSL -o /tmp/ckpt.tar.gz "https://zenodo.org/api/records/15782389/file
 COPY nafp_worker.py /app/nafp_worker.py
 ENV PEAKNETFP_HOME=/opt/peaknetfp NAFP_DATA=/data/nafp NAFP_PORT=8099 TF_CPP_MIN_LOG_LEVEL=2 MPLBACKEND=Agg
 
-# Build-time functional test for both models: two synthetic "tracks" (different pink noise + tones) indexed at
-# 44.1 kHz, a 16 kHz excerpt of track B (from 15 s) must come back as track B at ~15 s.
-RUN cd /tmp \
-    && ffmpeg -v error -f lavfi -i "anoisesrc=d=40:c=pink:seed=3" -f lavfi -i "sine=f=330:d=40" -filter_complex amix=inputs=2 -ar 44100 a.wav \
-    && ffmpeg -v error -f lavfi -i "anoisesrc=d=40:c=pink:seed=11" -f lavfi -i "aevalsrc=0.4*sin(2*PI*(220+110*sin(0.7*t))*t):d=40" -filter_complex amix=inputs=2 -ar 44100 b.wav \
-    && ffmpeg -v error -ss 15 -t 10 -i b.wav -ar 16000 -ac 1 q.wav \
-    && for m in neuralfp peaknetfp; do \
-         NAFP_DATA=/tmp/nafp python /app/nafp_worker.py index $m /tmp/a.wav /tmp/b.wav \
-         && NAFP_DATA=/tmp/nafp python /app/nafp_worker.py query $m /tmp/q.wav | tee /tmp/r.json \
-         && python -c "import json,sys; r=json.load(open('/tmp/r.json')); assert r and r['path']=='/tmp/b.wav' and abs(r['offset']-15)<=1 and r['score']>=0.3, r; print('$m ok', r)" \
-         || exit 1; \
-       done \
-    && rm -rf /tmp/nafp /tmp/*.wav /tmp/r.json
+# Build-time functional test (synthetic audio, both models) — see selftest.sh
+COPY selftest.sh /app/selftest.sh
+RUN sh /app/selftest.sh
 
 EXPOSE 8099
 CMD ["python", "/app/nafp_worker.py"]
