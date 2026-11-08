@@ -10,11 +10,13 @@
   :root {
     --bg: #09090b; --surface: #111113; --surface-2: #18181b; --surface-3: #1f1f23;
     --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
-    --text: #fafafa; --text-2: rgba(255,255,255,0.62); --text-3: rgba(255,255,255,0.38);
+    --text: #fafafa; --text-2: rgba(255,255,255,0.66); --text-3: rgba(255,255,255,0.5);
     --accent: #3b82f6; --accent-soft: rgba(59,130,246,0.15);
     --green: #4ade80; --green-soft: rgba(74,222,128,0.14);
     --amber: #fbbf24; --amber-soft: rgba(251,191,36,0.14);
     --red: #f87171; --red-soft: rgba(248,113,113,0.14);
+    /* method families: one colour each, used in timeline blocks, row borders and tags */
+    --m-cloud: #3b82f6; --m-local: #a78bfa; --m-ref: #2dd4bf; --m-emu: #9ca3af; --m-none: #52525b;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
     --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
     --r: 10px;
@@ -25,7 +27,7 @@
   input, select { font: inherit; color: inherit; }
   [hidden] { display: none !important; }
   [title] { cursor: help; }
-  button[title], .file[title], .dir[title] { cursor: pointer; }
+  button[title], .file[title], .dir[title], .qrow[title], .tl [title], summary[title] { cursor: pointer; }
   abbr { text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; }
 
   /* ---- header ---- */
@@ -33,17 +35,19 @@
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; font-size: 15px; }
   .logo .dot { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at center, var(--bg) 0 3px, var(--accent) 4px); box-shadow: 0 0 16px var(--accent-soft); }
   .logo span { color: var(--text-3); font-weight: 400; margin-left: 4px; }
-  .health { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
+  .hdr-right { display: flex; align-items: center; gap: 12px; }
+  .health { display: flex; gap: 10px; font-size: 12px; color: var(--text-2); }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11.5px; }
   .pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
-  .pill.ok::before { background: var(--green); } .pill.bad::before { background: var(--red); }
+  .pill.ok::before { background: var(--green); } .pill.bad::before { background: var(--red); } .pill.warn::before { background: var(--amber); }
+  button.pill:hover { border-color: var(--border-strong); }
 
   /* ---- layout ---- */
   main { display: grid; grid-template-columns: 330px 1fr; min-height: 0; }
   aside { border-right: 1px solid var(--border); background: var(--surface); display: grid; grid-template-rows: auto auto 1fr; min-height: 0; }
   section.work { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
   .panel-title .btn { text-transform: none; letter-spacing: 0; }
-  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding: 14px 16px 8px; display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding: 14px 16px 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
   /* ---- browser ---- */
   .pathbar { display: flex; gap: 6px; padding: 0 12px 10px; }
@@ -59,111 +63,181 @@
   .file .size { font-size: 11px; color: var(--text-3); font-family: var(--mono); flex: none; }
   .file .add { opacity: 0; width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 15px; line-height: 1; flex: none; }
   .file:hover .add { opacity: 1; }
-  .file.queued { opacity: 0.55; }
-  .file.queued .add { background: var(--surface-3); color: var(--text-3); }
+  .file.queued .add { opacity: 1; background: var(--green-soft); color: var(--green); }
   .empty { padding: 20px 12px; color: var(--text-3); font-size: 13px; text-align: center; }
   svg.ico { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ---- queue ---- */
+  /* ---- queue: one row per set, the row IS the tab ---- */
   .queue { border-bottom: 1px solid var(--border); background: var(--surface); }
-  .queue-body { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 0 16px 14px; align-items: start; }
-  .sets { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .set { display: grid; grid-template-columns: 24px 1fr auto auto; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
-  .set.active { border-color: var(--accent); }
-  .set .num { font-family: var(--mono); font-size: 12px; color: var(--text-3); }
-  .set .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .set .sub { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .set .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); transition: width 0.4s; }
-  .status { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .status.bezig { background: var(--accent-soft); color: #93c5fd; }
-  .status.klaar { background: var(--green-soft); color: var(--green); }
-  .status.fout { background: var(--red-soft); color: var(--red); }
-  .status.gestopt { background: var(--amber-soft); color: var(--amber); }
-  .set .rm { color: var(--text-3); width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
-  .set .rm:hover { color: var(--red); background: var(--red-soft); }
-  .set .redo:hover { color: var(--accent); background: var(--accent-soft); }
-  .set .rm:disabled { opacity: 0.3; cursor: default; }
-  .controls { display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
-  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-2); }
-  .field input { width: 70px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; text-align: right; font-family: var(--mono); font-size: 12px; outline: none; }
-  .field input:focus { border-color: var(--accent); }
+  .queue-body { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 0 16px 12px; align-items: start; }
+  .qrows { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-height: 168px; overflow: auto; padding-right: 2px; }
+  .qrow { display: grid; grid-template-columns: 20px 10px minmax(120px, 1fr) minmax(80px, 180px) 44px auto; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid transparent; }
+  .qrow:hover { background: var(--surface-3); }
+  .qrow.active { border-left-color: var(--accent); background: var(--surface-3); }
+  .qrow .num { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); text-align: right; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); flex: none; }
+  .dot.bezig { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); animation: pulse 1.2s ease-in-out infinite; }
+  .dot.klaar { background: var(--green); } .dot.fout { background: var(--red); } .dot.gestopt { background: var(--amber); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(59,130,246,0.05); } }
+  .qrow .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 13px; }
+  .mini { height: 6px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; position: relative; }
+  .mini i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); transition: width .4s; }
+  .mini.klaar i { background: var(--green); } .mini.fout i { background: var(--red); } .mini.gestopt i { background: var(--amber); }
+  .qrow .cnt { font-family: var(--mono); font-size: 12px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .qrow .cnt small { color: var(--text-3); font-size: 10px; }
+  .qrow .acts { display: flex; gap: 2px; }
+  .qrow .rm { color: var(--text-3); width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
+  .qrow .rm:hover { color: var(--red); background: var(--red-soft); }
+  .qrow .redo:hover { color: var(--accent); background: var(--accent-soft); }
+  .qrow .rm:disabled { opacity: 0.3; cursor: default; }
+  .controls { display: flex; flex-direction: column; gap: 8px; min-width: 250px; }
+  .ctl-line { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  .ctl-line input { width: 54px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 7px; text-align: right; font-family: var(--mono); font-size: 12px; outline: none; }
+  .ctl-line input:focus { border-color: var(--accent); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 14px; border-radius: 8px; font-weight: 550; font-size: 13px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); transition: background .15s, border-color .15s; }
   .btn:hover { background: var(--surface-3); border-color: var(--border-strong); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.primary:hover { background: #2f6fe0; }
+  .btn.stop { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+  .btn.stop:hover { background: rgba(248,113,113,0.25); }
   .btn.danger { color: var(--red); } .btn.danger:hover { background: var(--red-soft); border-color: var(--red); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn.sm { padding: 5px 10px; font-size: 12px; }
-  .btn-row { display: flex; gap: 8px; }
+
+  /* ---- timeline (shared by live scan and result) ---- */
+  .tl { position: relative; height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .tl .blk { position: absolute; top: 4px; bottom: 4px; border-radius: 3px; background: var(--m-cloud); opacity: .85; min-width: 2px; }
+  .tl .blk:hover { opacity: 1; outline: 1px solid #fff; }
+  .tl .blk.weak { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.35) 0 4px, transparent 4px 8px); }
+  .tl .blk.doubt::before { content: ''; position: absolute; left: -1px; top: -4px; border: 5px solid transparent; border-top: 6px solid var(--amber); }
+  .tl .gap { position: absolute; top: 4px; bottom: 4px; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(248,113,113,.55) 0 3px, transparent 3px 7px); border: 1px dashed rgba(248,113,113,.7); }
+  .tl .tick { position: absolute; top: 6px; bottom: 6px; width: 2px; border-radius: 1px; }
+  .tl .tick.match { background: var(--green); } .tl .tick.same { background: rgba(255,255,255,.35); } .tl .tick.none, .tl .tick.skip { background: rgba(255,255,255,.1); } .tl .tick.error { background: var(--red); }
+  .tl .head { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px #fff; }
+  .tl .todo { position: absolute; top: 0; bottom: 0; right: 0; background: repeating-linear-gradient(90deg, transparent 0 6px, rgba(255,255,255,.03) 6px 12px); }
+  .tl-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); padding: 2px 2px 0; }
 
   /* ---- results ---- */
-  .results { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
-  .tabs { display: flex; gap: 2px; padding: 10px 16px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
-  .tab { padding: 8px 14px; border-radius: 8px 8px 0 0; font-size: 13px; color: var(--text-2); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; border-bottom: 0; }
-  .tab:hover { color: var(--text); background: var(--surface); }
-  .tab.active { color: var(--text); background: var(--surface-2); border-color: var(--border); }
-  .tab .cnt { font-family: var(--mono); font-size: 11px; color: var(--text-3); white-space: pre; }
-  .result-body { overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .toolbar .meta { color: var(--text-3); font-size: 12.5px; margin-right: auto; }
-  .toolbar .meta b { color: var(--text-2); font-weight: 500; }
-  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
-  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); padding: 10px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
-  td { padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .results { display: grid; grid-template-rows: 1fr; min-height: 0; }
+  .result-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .result-body > * { flex: none; } /* column flex + overflow: fixed-height children (timeline) would otherwise shrink to 0 */
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .kpis { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-right: auto; }
+  .kpi { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--text-2); }
+  .kpi b { font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
+  .kpi.amber { border-color: rgba(251,191,36,.4); color: var(--amber); } .kpi.amber b { color: var(--amber); }
+  .kpi.red { border-color: rgba(248,113,113,.4); color: var(--red); } .kpi.red b { color: var(--red); }
+  .kpi.muted { color: var(--text-3); }
+  button.kpi:hover { background: var(--surface-3); }
+  .kpi .act { margin-left: 2px; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: 11px; }
+  .kpi .act:hover { color: var(--red); background: var(--red-soft); }
+  .menu { position: relative; }
+  .menu > summary { list-style: none; } .menu > summary::-webkit-details-marker { display: none; }
+  .menu-items { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 230px; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 10px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 2px; }
+  .menu-items button { text-align: left; padding: 7px 10px; border-radius: 7px; font-size: 13px; display: flex; justify-content: space-between; gap: 10px; }
+  .menu-items button small { color: var(--text-3); }
+  .menu-items button:hover { background: var(--surface-2); }
+  .menu-note { font-size: 11px; color: var(--text-3); padding: 6px 10px 4px; border-top: 1px solid var(--border); margin-top: 4px; }
+  .notice { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--r); border: 1px solid; font-size: 13px; }
+  .notice.fout { background: var(--red-soft); border-color: rgba(248,113,113,.4); color: var(--red); }
+  .notice.gestopt { background: var(--amber-soft); border-color: rgba(251,191,36,.4); color: var(--amber); }
+  .notice .msg { flex: 1; min-width: 0; }
+  .notice .btn { color: var(--text); }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; table-layout: fixed; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); padding: 10px 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  th.sort { cursor: pointer; } th.sort:hover { color: var(--text); }
+  td { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: 0; }
   tr:hover td { background: rgba(255,255,255,0.015); }
-  td.n { font-family: var(--mono); font-size: 12px; color: var(--text-3); width: 52px; text-align: right; padding-right: 10px; white-space: nowrap; }
-  td.t { width: 92px; }
-  td.act { width: 40px; text-align: center; }
-  td.artist { width: 32%; }
-  tr.weak td { opacity: 0.5; }
+  tr.hl td { background: var(--accent-soft); }
+  td.n { font-family: var(--mono); font-size: 12px; color: var(--text-3); text-align: right; padding-right: 8px; white-space: nowrap; border-left: 3px solid var(--m-none); }
+  tr.fam-cloud td.n { border-left-color: var(--m-cloud); } tr.fam-local td.n { border-left-color: var(--m-local); } tr.fam-ref td.n { border-left-color: var(--m-ref); } tr.fam-emu td.n { border-left-color: var(--m-emu); }
+  th.c-n { width: 54px; } th.c-t { width: 88px; } th.c-a { width: 28%; } th.c-x { width: 36px; }
+  tr.weak td { opacity: 0.65; }
   tr.weak td input:focus { opacity: 1; }
-  tr.weak td.n::after { content: ' 1×'; font-size: 10px; color: var(--amber); }
-  td input { width: 100%; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; outline: none; }
+  .badge1 { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 10px; font-family: var(--mono); }
+  td input { width: 100%; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; outline: none; text-overflow: ellipsis; }
   td input:hover { border-color: var(--border); }
   td input:focus { border-color: var(--accent); background: var(--surface-2); }
   td.t input { font-family: var(--mono); font-size: 12.5px; }
   td.t input.bad { border-color: var(--red); }
-  td .album { display: block; font-size: 11px; color: var(--text-3); padding: 0 8px 4px; }
+  td.t input.doubt { color: var(--amber); }
+  td .extras { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); padding: 0 8px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   td .del { color: var(--text-3); width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; }
   td .del:hover { color: var(--red); background: var(--red-soft); }
-  .warn { font-size: 12px; color: var(--amber); }
-  .log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); font-family: var(--mono); font-size: 12px; max-height: 220px; overflow: auto; padding: 8px 12px; color: var(--text-2); }
-  .log.live { flex: 1 1 0; max-height: none; min-height: 160px; } /* during a scan: fill the panel down to the bottom, scroll inside */
+  tr.gaprow td { padding: 0; border-bottom: 1px dashed rgba(248,113,113,.5); background: transparent; }
+  tr.gaprow button { width: 100%; padding: 3px 12px; font-size: 11px; color: var(--red); text-align: left; display: flex; gap: 10px; align-items: center; }
+  tr.gaprow button:hover { background: var(--red-soft); }
+  tr.gaprow button span { color: var(--text-3); }
+  .mtag { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
+  .mtag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--m-none); }
+  .mtag.fam-cloud::before { background: var(--m-cloud); } .mtag.fam-local::before { background: var(--m-local); } .mtag.fam-ref::before { background: var(--m-ref); } .mtag.fam-emu::before { background: var(--m-emu); }
+  .log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); font-family: var(--mono); font-size: 12px; max-height: 240px; overflow: auto; padding: 8px 12px; color: var(--text-2); }
   .log div { display: grid; grid-template-columns: 70px 16px 1fr; gap: 10px; padding: 2px 0; }
   .log .ts { color: var(--text-3); }
   .log .ok { color: var(--green); } .log .same { color: var(--text-3); } .log .none { color: var(--text-3); } .log .err { color: var(--red); }
-  .placeholder { height: 100%; display: grid; place-items: center; color: var(--text-3); text-align: center; padding: 40px; }
-  .placeholder p { max-width: 380px; margin-top: 8px; font-size: 13px; }
-  .placeholder h3 { color: var(--text-2); font-weight: 500; }
-  .progress { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .progress i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
-  .toast { position: fixed; bottom: 18px; right: 18px; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 14px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5); opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; }
-  .toast.show { opacity: 1; transform: none; }
-  .toast.err { border-color: var(--red); color: var(--red); }
-  /* ---- methods / settings ---- */
-  .mtag { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
-  td.m { width: 1%; white-space: nowrap; padding: 0 8px; }
   .log .mtag { margin-left: 8px; }
-  .hdr-right { display: flex; align-items: center; gap: 12px; }
-  .settings { overflow: auto; min-height: 0; }
-  .settings-body { max-width: 980px; padding: 6px 20px 40px; display: flex; flex-direction: column; gap: 6px; }
-  .settings h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 18px 0 4px; display: flex; gap: 10px; align-items: baseline; }
+  details.sub > summary { color: var(--text-3); font-size: 12px; cursor: pointer; user-select: none; }
+  details.sub > summary:hover { color: var(--text-2); }
+  details.sub[open] > summary { margin-bottom: 8px; }
+  .live-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+  .live-meta b { color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 14px; }
+  .live-meta .status { margin-left: auto; }
+  .status { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .status.bezig { background: var(--accent-soft); color: #93c5fd; }
+  .placeholder { height: 100%; display: grid; place-items: center; color: var(--text-3); text-align: center; padding: 40px; }
+  .steps { display: flex; gap: 28px; align-items: flex-start; }
+  .step { width: 150px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-3); }
+  .step .ic { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border-strong); display: grid; place-items: center; color: var(--text-3); }
+  .step .ic svg { width: 20px; height: 20px; }
+  .step.on { color: var(--text); } .step.on .ic { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .step.done .ic { border-color: var(--green); color: var(--green); }
+  .steps .arrow { align-self: center; color: var(--text-3); margin-top: -18px; }
+  .toast { position: fixed; bottom: 18px; right: 18px; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 14px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5); opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 480px; }
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast.err { border-color: var(--red); color: var(--red); cursor: pointer; }
+  .warn { font-size: 12px; color: var(--amber); }
+
+  /* ---- settings ---- */
+  .settings { overflow: auto; min-height: 0; position: relative; }
+  .subnav { position: sticky; top: 0; z-index: 4; display: flex; gap: 4px; padding: 8px 20px; background: rgba(9,9,11,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+  .subnav a { color: var(--text-2); text-decoration: none; font-size: 12.5px; padding: 5px 10px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center; }
+  .subnav a:hover { background: var(--surface-2); color: var(--text); }
+  .subnav a b { font-family: var(--mono); font-weight: 500; font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); }
+  .subnav a b.amber { background: var(--amber-soft); color: var(--amber); } .subnav a b.red { background: var(--red-soft); color: var(--red); } .subnav a b.ok { background: var(--green-soft); color: var(--green); }
+  .settings-body { max-width: 1180px; padding: 6px 20px 60px; display: flex; flex-direction: column; gap: 6px; }
+  .settings h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 20px 0 6px; display: flex; gap: 10px; align-items: baseline; scroll-margin-top: 52px; }
   .settings h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; }
+  .strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 8px; font-size: 12.5px; }
+  .strip .arrow { color: var(--text-3); }
+  .strip .chipm { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); }
+  .strip .chipm.skip { border-style: dashed; color: var(--text-3); background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,.03) 6px 12px); }
+  .strip .chipm:hover { border-color: var(--text-3); }
+  .strip .end { color: var(--text-3); font-family: var(--mono); }
+  .strip .lbl { color: var(--text-3); margin-right: 4px; }
+  .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+  .sdot.ok { background: var(--green); } .sdot.key, .sdot.index { background: var(--amber); } .sdot.tool { background: var(--red); } .sdot.na { background: var(--m-none); }
   .mlist { display: flex; flex-direction: column; gap: 6px; }
-  .mcard { display: grid; grid-template-columns: 24px 22px 40px 1fr auto 32px; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border); }
-  .mcard.off { opacity: 0.6; } .mcard.off:hover { opacity: 0.85; }
+  .mcard { display: grid; grid-template-columns: 24px 22px 40px 1fr auto 32px; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--text-3); scroll-margin-top: 60px; }
+  .mcard.ok { border-left-color: var(--green); } .mcard.key, .mcard.index { border-left-color: var(--amber); } .mcard.tool { border-left-color: var(--red); }
+  .mcard.off { opacity: 0.55; border-left-color: var(--border-strong); } .mcard.off:hover { opacity: 0.85; }
   .mcard.dragging { opacity: 0.4; border-style: dashed; }
   .mcard.na { grid-template-columns: 1fr auto; opacity: 0.7; }
+  .mcard.flash { outline: 2px solid var(--accent); }
   .grip { color: var(--text-3); cursor: grab; width: 24px; height: 28px; border-radius: 6px; font-size: 13px; letter-spacing: -2px; }
   .grip:hover, .grip:focus-visible { color: var(--text); background: var(--surface-2); outline: none; }
   .pos { font-family: var(--mono); font-size: 11.5px; color: var(--accent); text-align: center; }
   .mname { min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .mname b { font-weight: 550; }
+  .kind { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
+  .kind i { width: 8px; height: 8px; border-radius: 2px; background: var(--m-none); }
+  .kind.fam-cloud i { background: var(--m-cloud); } .kind.fam-local i { background: var(--m-local); } .kind.fam-ref i { background: var(--m-ref); } .kind.fam-emu i { background: var(--m-emu); }
+  .stwrap { display: flex; align-items: center; gap: 6px; }
   .st { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
   .st.ok { background: var(--green-soft); color: var(--green); }
   .st.key, .st.index { background: var(--amber-soft); color: var(--amber); }
   .st.tool { background: var(--red-soft); color: var(--red); }
+  .st.link { cursor: pointer; } .st.link:hover { filter: brightness(1.2); }
   .switch { position: relative; width: 40px; height: 22px; display: inline-block; cursor: pointer; }
   .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
   .switch i { position: absolute; inset: 0; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--border-strong); transition: .15s; }
@@ -172,6 +246,9 @@
   .switch input:checked + i::after { left: 20px; background: #fff; }
   .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
   .mfields { grid-column: 3 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 24px; padding: 6px 0 4px; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-2); }
+  .field input { width: 70px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; text-align: right; font-family: var(--mono); font-size: 12px; outline: none; }
+  .field input:focus { border-color: var(--accent); }
   .mfields .field input.wide, .mfields .field select, .sfield input.wide { width: 190px; text-align: left; }
   .field select { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 12px; outline: none; }
   .install { grid-column: 1 / -1; font-size: 12px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: var(--mono); white-space: pre-wrap; }
@@ -185,7 +262,17 @@
   .sfield { display: inline-flex; align-items: center; gap: 8px; }
   .sfield input { width: 70px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-family: var(--mono); font-size: 12px; outline: none; }
   .sfield input:focus, .mfields input:focus { border-color: var(--accent); }
+  .locals { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+  .locals div { display: flex; align-items: center; gap: 8px; }
+  .locals .n { margin-left: auto; font-family: var(--mono); color: var(--text-3); }
+  .progress { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+  .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+  .seg button { padding: 6px 12px; font-size: 12.5px; color: var(--text-2); }
+  .seg button + button { border-left: 1px solid var(--border-strong); }
+  .seg button.on { background: var(--accent); color: #fff; }
   ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 999px; border: 2px solid var(--bg); } ::-webkit-scrollbar-track { background: transparent; }
+  @media (max-width: 1200px) { .qrow { grid-template-columns: 20px 10px minmax(100px, 1fr) 90px 40px auto; } th.c-a { width: 32%; } }
 </style>
 </head>
 <body>
@@ -211,27 +298,30 @@
 
   <section class="work">
     <div class="queue">
-      <div class="panel-title">Wachtrij <span id="queue-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <div class="panel-title">
+        <span>Wachtrij <span id="queue-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></span>
+        <button class="btn sm" id="queue-fold" title="Alleen de actieve set tonen / alles tonen" hidden>▾</button>
+      </div>
       <div class="queue-body">
-        <div class="sets" id="sets"></div>
+        <div class="qrows" id="sets"></div>
         <div class="controls">
-          <label class="field"><abbr title="Afstand in seconden tussen twee herkenningsmomenten. Bepaalt hoe nauwkeurig de van/tot-tijden zijn: 30 s stap = maximaal 30 s afwijking. Kleiner = nauwkeuriger maar trager (3 s wachttijd per stap i.v.m. Shazam-limiet).">Stap (s)</abbr><input id="step" type="number" min="10" max="120" step="5" value="30"></label>
-          <label class="field"><abbr title="Lengte van het audiofragment dat per stap naar Shazam gaat (fingerprint). 18 s is de standaard; langer herkent iets beter, korter is sneller.">Fragment (s)</abbr><input id="segment" type="number" min="5" max="30" step="1" value="18"></label>
-          <div class="btn-row">
-            <button class="btn primary" id="start" style="flex:1" title="Scan alle sets in de wachtrij achter elkaar">Scannen</button>
-            <button class="btn danger" id="stop" title="Stop de lopende scan; wat al herkend is blijft staan" disabled>Stop</button>
+          <div class="ctl-line">
+            <abbr title="Afstand in seconden tussen twee herkenningsmomenten. Kleiner = nauwkeuriger maar trager (Shazam: 3 s pauze per stap).">Stap</abbr><input id="step" type="number" min="10" max="120" step="5" value="30"><span>s</span>
+            <span style="width:8px"></span>
+            <abbr title="Lengte van het audiofragment (fingerprint) dat per stap naar de herkenning gaat. 18 s is de standaard.">Fragment</abbr><input id="segment" type="number" min="5" max="30" step="1" value="18"><span>s</span>
           </div>
+          <button class="btn primary" id="start" title="Scan alle sets in de wachtrij achter elkaar">Scannen</button>
         </div>
       </div>
     </div>
 
     <div class="results">
-      <div class="tabs" id="tabs"></div>
       <div class="result-body" id="result"></div>
     </div>
   </section>
 
   <section class="settings" id="settings" hidden>
+    <nav class="subnav" id="subnav"></nav>
     <div class="settings-body" id="settings-body"></div>
   </section>
 </main>
@@ -245,13 +335,15 @@ const state = loadState();
 let es = null;            // active EventSource
 let running = false;      // queue runner active
 let browsePath = '';
+let scanStartedAt = 0;    // for the ETA of the running scan
+let highlight = null;     // KPI chip filter: 'doubt' | 'weak' | 'gap' | null
 
 function loadState() {
   try { const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s && Array.isArray(s.sets)) return s; } catch {}
   return { sets: [], activeId: null, step: 30, segment: 18 };
 }
 function save() {
-  const copy = { ...state, sets: state.sets.map(s => ({ ...s, log: (s.log || []).slice(-200) })) };
+  const copy = { ...state, sets: state.sets.map(s => ({ ...s, log: (s.log || []).slice(-400) })) };
   localStorage.setItem(LS_KEY, JSON.stringify(copy));
 }
 // A set that was mid-scan when the page was closed/refreshed can't resume — reset it to the queue.
@@ -261,6 +353,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const active = () => state.sets.find(s => s.id === state.activeId);
 
 // ------------------------------------------------------------------ time helpers
 function fmt(sec) {
@@ -275,19 +368,34 @@ function parseTime(str) {
   return (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]);
 }
 const fmtSize = (b) => b > 1e9 ? (b / 1e9).toFixed(2) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' kB';
+const fmtMin = (sec) => sec < 90 ? `${Math.max(1, Math.round(sec))} s` : `${Math.round(sec / 60)} min`;
 
-// ------------------------------------------------------------------ toast
+// method family (colour) from a method label, e.g. "Shazam −4% vinyl", "AudD + Google", "MixesDB (volgorde)"
+function fam(method) {
+  const m = String(method || '').split(' + ')[0];
+  if (/^(Shazam|AudD|AudioTag|AcoustID)/i.test(m)) return 'cloud';
+  if (/^(Olaf|audfprint|Panako|Dejavu|NeuralFP|PeakNetFP)/i.test(m)) return 'local';
+  if (/^(trackid|1001|MixesDB)/i.test(m)) return 'ref';
+  if (/^Google/i.test(m)) return 'emu';
+  return 'none';
+}
+const famOfKind = (m) => m.local ? 'local' : m.group === 'reference' ? 'ref' : m.kind === 'Emulator' ? 'emu' : m.kind === 'Cloud' ? 'cloud' : 'none';
+
+// ------------------------------------------------------------------ toast (errors stay until clicked)
 let toastTimer;
 function toast(msg, err = false) {
   const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', 3200);
+  clearTimeout(toastTimer);
+  if (!err) toastTimer = setTimeout(() => t.className = 'toast', 3200);
 }
+$('toast').onclick = () => { $('toast').className = 'toast'; };
 
 // ------------------------------------------------------------------ health
 fetch('/api/health').then(r => r.json()).then(h => {
   $('health').innerHTML =
     `<span class="pill ${h.ffmpeg && h.ffprobe ? 'ok' : 'bad'}" title="ffmpeg knipt de audiofragmenten; zonder ffmpeg kan er niet gescand worden">ffmpeg ${h.ffmpeg && h.ffprobe ? 'gevonden' : 'ontbreekt'}</span>` +
-    `<span class="pill" id="chain-pill">keten…</span>`;
+    `<button class="pill" id="chain-pill" title="Herkenningsketen — klik om te wijzigen">keten…</button>`;
+  $('chain-pill').onclick = () => setView('settings');
   loadMethods();
   if (!browsePath) browse(h.startDir);
   $('startdir-btn').onclick = () => browse(h.startDir);
@@ -309,7 +417,7 @@ async function browse(path) {
   const isDrives = !d.path;
   let html = '';
   for (const dir of d.dirs) html += `<div class="dir" data-path="${esc(dir.path)}">${isDrives ? ICON_DRIVE : ICON_DIR}<span class="name">${esc(dir.name)}</span></div>`;
-  for (const f of d.files) html += `<div class="file ${queued.has(f.path) ? 'queued' : ''}" data-path="${esc(f.path)}" data-name="${esc(f.name)}" title="${queued.has(f.path) ? 'Staat al in de wachtrij' : 'Klik om toe te voegen aan de wachtrij'}">${ICON_AUDIO}<span class="name">${esc(f.name)}</span><span class="size">${fmtSize(f.size)}</span><span class="add">+</span></div>`;
+  for (const f of d.files) html += `<div class="file ${queued.has(f.path) ? 'queued' : ''}" data-path="${esc(f.path)}" data-name="${esc(f.name)}" title="${queued.has(f.path) ? 'Staat al in de wachtrij' : 'Klik om toe te voegen aan de wachtrij'}">${ICON_AUDIO}<span class="name">${esc(f.name)}</span><span class="size">${fmtSize(f.size)}</span><span class="add">${queued.has(f.path) ? '✓' : '+'}</span></div>`;
   if (!html) html = '<div class="empty">Geen submappen of audiobestanden</div>';
   $('tree').innerHTML = html;
 }
@@ -339,53 +447,63 @@ function requeueSet(id) {
   const s = state.sets.find(s => s.id === id);
   if (!s || s.status === 'bezig') return;
   if (s.tracks.length && !confirm(`"${s.name}" opnieuw scannen? ${plural(s.tracks.length, 'huidige track wordt', 'huidige tracks worden')} vervangen (incl. bewerkingen).`)) return;
-  s.status = 'wachtrij'; s.pct = 0; s.tracks = []; s.log = []; save(); renderAll();
+  s.status = 'wachtrij'; s.pct = 0; s.tracks = []; s.log = []; s.error = null; save(); renderAll();
 }
 const STATUS_LABEL = { wachtrij: 'In wachtrij', bezig: 'Bezig', klaar: 'Klaar', fout: 'Fout', gestopt: 'Gestopt' };
 
 function renderQueue() {
   const el = $('sets');
-  $('queue-count').textContent = state.sets.length ? `${state.sets.length} set${state.sets.length > 1 ? 's' : ''}` : '';
-  if (!state.sets.length) { el.innerHTML = '<div class="empty" style="text-align:left;padding:10px 4px">Kies links een bestand om toe te voegen.</div>'; }
-  else el.innerHTML = state.sets.map((s, i) => `
-    <div class="set ${s.id === state.activeId ? 'active' : ''}" data-id="${s.id}">
+  const n = state.sets.length;
+  $('queue-count').textContent = n ? `${n} set${n > 1 ? 's' : ''}` : '';
+  $('queue-fold').hidden = n < 2;
+  $('queue-fold').textContent = state.queueFold ? '▸' : '▾';
+  $('queue-fold').title = state.queueFold ? 'Alle sets tonen' : 'Alleen de actieve set tonen';
+  const rows = state.queueFold ? state.sets.filter(s => s.id === state.activeId || s.status === 'bezig') : state.sets;
+  if (!n) el.innerHTML = '<div class="empty" style="text-align:left;padding:8px 4px">Kies links een bestand om toe te voegen.</div>';
+  else el.innerHTML = rows.map((s) => {
+    const i = state.sets.indexOf(s);
+    const pct = s.status === 'bezig' ? s.pct : s.status === 'wachtrij' ? 0 : 100;
+    const cnt = s.status === 'wachtrij' ? '' : s.status === 'bezig' ? `${s.pct}<small>%</small>` : `${s.tracks.length}<small> tr</small>`;
+    return `<div class="qrow ${s.id === state.activeId ? 'active' : ''}" data-id="${s.id}" title="${esc(s.path)} — ${STATUS_LABEL[s.status]}">
       <span class="num">${i + 1}</span>
-      <div style="min-width:0"><div class="title" title="${esc(s.path)}">${esc(s.name)}</div><div class="sub">${esc(s.path)}</div></div>
-      <span class="status ${s.status}">${STATUS_LABEL[s.status]}${s.status === 'bezig' ? ` ${s.pct}%` : s.status !== 'wachtrij' ? ` · ${plural(s.tracks.length, 'track', 'tracks')}` : ''}</span>
-      <span style="display:flex;gap:2px">${s.status !== 'wachtrij' && s.status !== 'bezig' ? `<button class="rm redo" title="Opnieuw scannen (huidige tracks worden vervangen)">↻</button>` : ''}<button class="rm" title="Uit wachtrij verwijderen" ${s.status === 'bezig' ? 'disabled' : ''}>✕</button></span>
-      <i class="bar" style="width:${s.status === 'bezig' ? s.pct : 0}%"></i>
-    </div>`).join('');
+      <i class="dot ${s.status}"></i>
+      <span class="title">${esc(s.name)}</span>
+      <span class="mini ${s.status}" title="${s.status === 'bezig' ? `Voortgang ${s.pct}%` : STATUS_LABEL[s.status]}"><i style="width:${pct}%"></i></span>
+      <span class="cnt">${cnt}</span>
+      <span class="acts">${s.status !== 'wachtrij' && s.status !== 'bezig' ? `<button class="rm redo" title="Opnieuw scannen (huidige tracks worden vervangen)">↻</button>` : ''}<button class="rm" title="Uit wachtrij verwijderen" ${s.status === 'bezig' ? 'disabled' : ''}>✕</button></span>
+    </div>`;
+  }).join('');
   const pending = state.sets.filter(s => s.status === 'wachtrij').length;
-  $('start').disabled = running || !pending;
-  $('start').textContent = running ? 'Bezig…' : pending ? `Scannen (${pending})` : 'Scannen';
-  $('stop').disabled = !running;
+  const b = $('start');
+  if (running) { b.className = 'btn stop'; b.textContent = 'Stop'; b.disabled = false; b.title = 'Stop na het huidige fragment; wat al herkend is blijft staan'; }
+  else { b.className = 'btn primary'; b.textContent = pending ? `Scannen (${pending})` : 'Scannen'; b.disabled = !pending; b.title = 'Scan alle sets in de wachtrij achter elkaar'; }
 }
 $('sets').addEventListener('click', (e) => {
-  const row = e.target.closest('.set'); if (!row) return;
+  const row = e.target.closest('.qrow'); if (!row) return;
   if (e.target.closest('.redo')) return requeueSet(row.dataset.id);
   if (e.target.closest('.rm')) return removeSet(row.dataset.id);
-  state.activeId = row.dataset.id; save(); renderAll();
+  highlight = null; state.activeId = row.dataset.id; save(); renderAll();
 });
+$('queue-fold').onclick = () => { state.queueFold = !state.queueFold; save(); renderQueue(); };
 $('step').value = state.step; $('segment').value = state.segment;
 $('step').onchange = (e) => { state.step = Math.min(120, Math.max(10, +e.target.value || 30)); e.target.value = state.step; save(); };
 $('segment').onchange = (e) => { state.segment = Math.min(30, Math.max(5, +e.target.value || 18)); e.target.value = state.segment; save(); };
 
 // ------------------------------------------------------------------ scanning
-$('start').onclick = () => { if (!running) { running = true; renderQueue(); runNext(); } };
-$('stop').onclick = async () => {
-  running = false;
-  await fetch('/api/scan/stop');
-  toast('Stoppen na het huidige fragment…');
+$('start').onclick = async () => {
+  if (running) { running = false; renderQueue(); await fetch('/api/scan/stop'); toast('Stoppen na het huidige fragment…'); return; }
+  running = true; renderQueue(); runNext();
 };
 
 function runNext() {
   const s = state.sets.find(s => s.status === 'wachtrij');
   if (!s || !running) { running = false; renderQueue(); if (!s) toast('Wachtrij afgerond'); return; }
-  s.status = 'bezig'; s.pct = 0; s.log = []; s.tracks = []; state.activeId = s.id;
+  s.status = 'bezig'; s.pct = 0; s.log = []; s.tracks = []; s.error = null; state.activeId = s.id;
+  scanStartedAt = Date.now(); highlight = null;
   save(); renderAll();
   const url = `/api/scan?file=${encodeURIComponent(s.path)}&step=${state.step}&segment=${state.segment}`;
   es = new EventSource(url);
-  es.addEventListener('start', (e) => { const d = JSON.parse(e.data); s.duration = d.duration; s.total = d.total; s.step = d.step; renderResult(); });
+  es.addEventListener('start', (e) => { const d = JSON.parse(e.data); s.duration = d.duration; s.total = d.total; s.step = d.step; s.segment = d.segment; renderResult(); });
   es.addEventListener('segment', (e) => {
     const d = JSON.parse(e.data);
     s.pct = d.pct; s.log.push(d);
@@ -416,118 +534,177 @@ const normalize = (t) => ({ id: uid(), start_sec: t.start_sec, end_sec: t.end_se
   method: t.method || '', bpm: t.bpm || '', key: t.key || '', isrc: t.isrc || '', mbid: t.mbid || '', label: t.label || '', exact: Boolean(t.exact), spread: t.spread ?? null, agree: t.agree || '', versions: t.versions || '' });
 // exact start where fewer than half of the offset estimates agree → worth a check
 const doubtful = (t) => { if (!t.exact || !t.agree) return false; const [a, n] = t.agree.split('/').map(Number); return a * 2 < n; };
+const GAP_SEC = 120;
+const posOf = (l) => l.pos ?? parseTime(l.timestamp) ?? 0;
+const gapBefore = (tracks, i) => i > 0 ? tracks[i].start_sec - tracks[i - 1].end_sec : 0;
+
+// ------------------------------------------------------------------ timeline (set duration as 100 %)
+function liveTimeline(s) {
+  const dur = s.duration || 1, last = s.log.filter(l => l.timestamp).at(-1), pos = last ? posOf(last) : 0;
+  const ticks = s.log.filter(l => l.timestamp).map(l => `<i class="tick ${l.status === 'same' ? 'same' : l.status}" style="left:${(posOf(l) / dur * 100).toFixed(2)}%" title="${esc(l.timestamp)} ${l.match ? esc(l.match.artist + ' — ' + l.match.title) : l.status === 'error' ? esc(l.message || 'fout') : 'niet herkend'}"></i>`).join('');
+  return `<div class="tl" id="live-tl"><i class="todo" style="width:${(100 - pos / dur * 100).toFixed(2)}%"></i>${ticks}<i class="head" style="left:${(pos / dur * 100).toFixed(2)}%"></i></div>
+    <div class="tl-axis"><span>00:00</span><span>${fmt(dur / 2)}</span><span>${fmt(dur)}</span></div>`;
+}
+function resultTimeline(s) {
+  const dur = s.duration || Math.max(1, ...s.tracks.map(t => t.end_sec));
+  const parts = s.tracks.map((t, i) => {
+    const gap = gapBefore(s.tracks, i);
+    const g = gap > GAP_SEC ? `<i class="gap" data-gap="${i}" style="left:${(s.tracks[i - 1].end_sec / dur * 100).toFixed(2)}%;width:${(gap / dur * 100).toFixed(2)}%" title="Gat van ${fmt(gap)} zonder herkende track — klik om hier een track toe te voegen"></i>` : '';
+    return g + `<i class="blk fam-${fam(t.method)} ${t.hits === 1 ? 'weak' : ''} ${doubtful(t) ? 'doubt' : ''}" data-row="${t.id}" style="left:${(t.start_sec / dur * 100).toFixed(2)}%;width:${(Math.max(0, t.end_sec - t.start_sec) / dur * 100).toFixed(2)}%;background:var(--m-${fam(t.method)})" title="${esc(t.artist)} — ${esc(t.title)} · ${fmt(t.start_sec)}–${fmt(t.end_sec)}${t.method ? ' · ' + esc(t.method) : ''}${t.hits === 1 ? ' · 1× herkend' : ''}${doubtful(t) ? ' · begintijd onzeker' : ''}"></i>`;
+  }).join('');
+  return `<div class="tl" id="res-tl">${parts}</div><div class="tl-axis"><span>00:00</span><span>${fmt(dur / 2)}</span><span>${fmt(dur)}</span></div>`;
+}
 
 // ------------------------------------------------------------------ results
-function renderTabs() {
-  $('tabs').innerHTML = state.sets.map(s =>
-    `<button class="tab ${s.id === state.activeId ? 'active' : ''}" data-id="${s.id}" title="${esc(s.path)}">${esc(s.name)}<span class="cnt">${s.status === 'wachtrij' ? '' : ' · ' + s.tracks.length}</span></button>`
-  ).join('');
-}
-$('tabs').addEventListener('click', (e) => { const t = e.target.closest('.tab'); if (t) { state.activeId = t.dataset.id; save(); renderAll(); } });
-
 const STATUS_ICON = { match: ['✓', 'ok'], same: ['↩', 'same'], none: ['?', 'none'], skip: ['–', 'none'], error: ['!', 'err'], note: ['i', 'same'] };
 function logLine(d) {
   const [ic, cls] = STATUS_ICON[d.status] || ['?', 'none'];
   const txt = d.match ? `${d.match.artist} — ${d.match.title}` : d.status === 'error' || d.status === 'note' ? d.message : d.status === 'skip' ? 'fragment overgeslagen' : 'niet herkend';
-  return `<div><span class="ts">${d.timestamp}</span><span class="${cls}">${ic}</span><span class="${cls}">${esc(txt)}${d.match?.method ? `<span class="mtag">${esc(d.match.method)}</span>` : ''}</span></div>`;
+  return `<div><span class="ts">${d.timestamp}</span><span class="${cls}">${ic}</span><span class="${cls}">${esc(txt)}${d.match?.method ? `<span class="mtag fam-${fam(d.match.method)}">${esc(d.match.method)}</span>` : ''}</span></div>`;
+}
+const mtag = (method) => method ? `<span class="mtag fam-${fam(method)}" title="Gevonden door ${esc(method)}">${esc(method)}</span>` : '';
+function foundRow(d, n) {
+  return `<tr><td class="n">${n}</td><td class="t"><input value="${d.timestamp}" readonly></td><td><input value="${esc(d.match.artist)}" readonly></td><td><input value="${esc(d.match.title)}" readonly><div class="extras">${mtag(d.match.method)}</div></td></tr>`;
+}
+function liveMeta(s) {
+  const found = s.log.filter(l => l.status === 'match' && l.match).length;
+  const last = s.log.filter(l => l.timestamp).at(-1), pos = last ? posOf(last) : 0;
+  const elapsed = scanStartedAt ? (Date.now() - scanStartedAt) / 1000 : 0;
+  const eta = elapsed && s.pct > 2 ? elapsed / s.pct * (100 - s.pct) : null;
+  return `<span><b>${fmt(pos)}</b> / ${s.duration ? fmt(s.duration) : '…'}</span><span>·</span><span><b>${found}</b> ${found === 1 ? 'wissel' : 'wissels'}</span><span>·</span><span title="Schatting op basis van de tijd tot nu toe">${eta != null ? `nog ±${fmtMin(eta)}` : 'nog …'}</span><span class="status bezig">Bezig ${s.pct}%</span>`;
 }
 function appendLog(s, d) {
   if (s.id !== state.activeId) return;
   const log = $('scanlog'); if (!log) return renderResult();
   log.insertAdjacentHTML('beforeend', logLine(d)); log.scrollTop = log.scrollHeight;
-  const p = $('scanpct'); if (p) p.style.width = d.pct + '%';
-  const m = $('scanmeta'); if (m) m.innerHTML = scanMeta(s);
-  const pill = $('scanpill'); if (pill) pill.textContent = `Bezig ${d.pct}%`;
-}
-function scanMeta(s) {
-  const found = s.log.filter(l => l.status === 'match').length;
-  return `Fragment <b>${s.log.length}/${s.total || '?'}</b> · <b>${found}</b> ${found === 1 ? 'wissel' : 'wissels'} gevonden · duur set <b>${s.duration ? fmt(s.duration) : '…'}</b>`;
+  const sum = $('scanlog-sum'); if (sum) sum.textContent = `Scanlog (${s.log.length})`;
+  const m = $('scanmeta'); if (m) m.innerHTML = liveMeta(s);
+  const tl = $('live-tl'); if (tl && d.timestamp) tl.outerHTML = liveTimeline(s).split('<div class="tl-axis">')[0];
+  if (d.status === 'match' && d.match) {
+    const body = $('found-body'); if (body) { body.insertAdjacentHTML('beforeend', foundRow(d, body.children.length + 1)); $('found-wrap').hidden = false; }
+  }
 }
 
-function extraLine(t) {
-  const bits = [t.album, t.year, t.label].filter(Boolean).map(esc).concat([
+function extras(t) {
+  const bits = [mtag(t.method)].concat([t.album, t.year, t.label].filter(Boolean).map(esc), [
     t.bpm && `<abbr title="Tempo in beats per minute (Essentia)">${esc(t.bpm)} BPM</abbr>`,
     t.key && `<abbr title="Toonsoort (Essentia)">${esc(t.key)}</abbr>`,
     t.isrc && `<abbr title="ISRC: internationale code van deze opname (MusicBrainz)">${esc(t.isrc)}</abbr>`,
-    t.versions && `<abbr title="Google noemt alleen artiest + titel, niet de remix. Deze versies stonden op de resultatenpagina; kies zelf (pas de titel aan)">versies? ${esc(t.versions)}</abbr>`].filter(Boolean));
-  return bits.length ? `<span class="album">${bits.join(' · ')}</span>` : '';
+    t.versions && `<abbr title="Google noemt alleen artiest + titel, niet de remix. Deze versies stonden op de resultatenpagina; kies zelf (pas de titel aan)">versies? ${esc(t.versions)}</abbr>`].filter(Boolean)).filter(Boolean);
+  return bits.length ? `<div class="extras">${bits.join('<span>·</span>')}</div>` : '';
+}
+const ICO_FOLDER = '<svg class="ico" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+const ICO_LIST = '<svg class="ico" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
+const ICO_PLAY = '<svg class="ico" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>';
+function emptyState(stage) {
+  const steps = [['Kies een map', 'links in Bestanden', ICO_FOLDER], ['Zet sets in de wachtrij', 'klik op een bestand', ICO_LIST], ['Scannen', 'resultaat verschijnt hier', ICO_PLAY]];
+  return `<div class="placeholder"><div class="steps">${steps.map(([t, sub, ic], i) => `${i ? '<span class="arrow">→</span>' : ''}<div class="step ${i < stage ? 'done' : i === stage ? 'on' : ''}"><span class="ic">${ic}</span><b>${t}</b><span>${sub}</span></div>`).join('')}</div></div>`;
 }
 
 function renderResult() {
-  const s = state.sets.find(s => s.id === state.activeId);
+  const s = active();
   const el = $('result');
-  if (!s) { el.innerHTML = `<div class="placeholder"><div><h3>Nog geen set geselecteerd</h3><p>Blader links naar een map met DJ-sets, voeg er een of meer toe aan de wachtrij en klik op Scannen. Hier verschijnt daarna per set de lijst met gevonden track IDs om na te kijken, te bewerken en op te slaan.</p></div></div>`; return; }
-  if (s.status === 'wachtrij') { el.innerHTML = `<div class="placeholder"><div><h3>${esc(s.name)}</h3><p>Staat in de wachtrij. Klik op Scannen om te beginnen.</p></div></div>`; return; }
+  if (!s) { el.innerHTML = emptyState(state.sets.length ? 2 : browsePath ? 1 : 0); return; }
+  if (s.status === 'wachtrij') { el.innerHTML = emptyState(2).replace('</div></div>', `<p style="margin-top:18px;font-size:13px">${esc(s.name)} staat in de wachtrij</p></div></div>`); return; }
   if (s.status === 'bezig') {
+    const found = s.log.filter(l => l.status === 'match' && l.match);
     el.innerHTML = `
-      <div class="toolbar"><span class="meta" id="scanmeta">${scanMeta(s)}</span><span class="status bezig" id="scanpill">Bezig ${s.pct}%</span></div>
-      <div class="progress"><i id="scanpct" style="width:${s.pct}%"></i></div>
-      <div class="log live" id="scanlog">${s.log.map(logLine).join('')}</div>`;
+      <div class="live-meta" id="scanmeta">${liveMeta(s)}</div>
+      ${liveTimeline(s)}
+      <div id="found-wrap" ${found.length ? '' : 'hidden'}><table><thead><tr><th class="c-n">#</th><th class="c-t">Vanaf</th><th class="c-a">Artiest</th><th>Titel</th></tr></thead><tbody id="found-body">${found.map((d, i) => foundRow(d, i + 1)).join('')}</tbody></table></div>
+      <details class="sub" ${found.length ? '' : 'open'}><summary id="scanlog-sum">Scanlog (${s.log.length})</summary><div class="log" id="scanlog">${s.log.map(logLine).join('')}</div></details>`;
     const log = $('scanlog'); log.scrollTop = log.scrollHeight;
     return;
   }
-  const rows = s.tracks.map((t, i) => `
-    <tr data-id="${t.id}" class="${t.hits === 1 ? 'weak' : ''}" ${t.hits === 1 ? 'title="Slechts 1 keer herkend — mogelijk een misser van Shazam tijdens een overgang. Controleer of verwijder."' : ''}>
-      <td class="n">${i + 1}</td>
-      <td class="t"><input data-f="start_sec" value="${fmt(t.start_sec)}" title="${t.exact ? `Op de seconde: berekend uit de offset (positie binnen het origineel). ${t.agree || ''} schattingen eens binnen ±2 s; totale spreiding ${t.spread} s (herhaalde maten/loops geven uitschieters)${doubtful(t) ? ' — minder dan de helft eens: controleer' : ''}` : `Eerste herkenning (±${s.step || state.step} s): geen bruikbare offset${t.agree ? ' (DJ startte de track waarschijnlijk midden in het nummer)' : ''}`}"${doubtful(t) ? ' style="color:var(--amber)"' : ''}></td>
-      <td class="t"><input data-f="end_sec" value="${fmt(t.end_sec)}" title="Overgang naar de volgende track (±${s.step || state.step} s); vrij te bewerken"></td>
-      <td class="artist"><input data-f="artist" value="${esc(t.artist)}" placeholder="Artiest"></td>
-      <td><input data-f="title" value="${esc(t.title)}" placeholder="Titel">${extraLine(t)}</td>
-      <td class="m">${t.method ? `<span class="mtag" title="Gevonden door ${esc(t.method)}">${esc(t.method)}</span>` : ''}</td>
+  const tr = s.tracks;
+  const nDoubt = tr.filter(doubtful).length, nWeak = tr.filter(t => t.hits === 1).length, nGap = tr.filter((t, i) => gapBefore(tr, i) > GAP_SEC).length;
+  const show = (t, i) => !highlight || (highlight === 'doubt' && doubtful(t)) || (highlight === 'weak' && t.hits === 1) || (highlight === 'gap' && (gapBefore(tr, i) > GAP_SEC || gapBefore(tr, i + 1) > GAP_SEC));
+  const rows = tr.map((t, i) => {
+    const gap = gapBefore(tr, i);
+    const gapRow = gap > GAP_SEC && (!highlight || highlight === 'gap') ? `<tr class="gaprow"><td colspan="6"><button data-gap="${i}" title="Hier staat ${fmt(gap)} zonder herkende track; klik om een lege regel toe te voegen">▭ gat ${fmt(gap)} <span>${fmt(tr[i - 1].end_sec)} – ${fmt(t.start_sec)} · klik om een track toe te voegen</span></button></td></tr>` : '';
+    if (!show(t, i)) return gapRow;
+    return gapRow + `<tr data-id="${t.id}" class="fam-${fam(t.method)} ${t.hits === 1 ? 'weak' : ''}" ${t.hits === 1 ? 'title="Slechts 1 keer herkend — mogelijk een misser tijdens een overgang. Controleer of verwijder."' : ''}>
+      <td class="n">${i + 1}${t.hits === 1 ? '<span class="badge1">1×</span>' : ''}</td>
+      <td class="t"><input data-f="start_sec" class="${doubtful(t) ? 'doubt' : ''}" value="${fmt(t.start_sec)}" title="${t.exact ? `Op de seconde: berekend uit de offset (positie binnen het origineel). ${t.agree || ''} schattingen eens binnen ±2 s; totale spreiding ${t.spread} s${doubtful(t) ? ' — minder dan de helft eens: controleer' : ''}` : `Eerste herkenning (±${s.step || state.step} s): geen bruikbare offset${t.agree ? ' (DJ startte de track waarschijnlijk midden in het nummer)' : ''}`}"></td>
+      <td class="t"><input data-f="end_sec" value="${fmt(t.end_sec)}" title="Overgang naar de volgende track; vrij te bewerken"></td>
+      <td><input data-f="artist" value="${esc(t.artist)}" placeholder="Artiest"></td>
+      <td><input data-f="title" value="${esc(t.title)}" placeholder="Titel">${extras(t)}</td>
       <td class="act"><button class="del" title="Track verwijderen">✕</button></td>
-    </tr>`).join('');
-  const gaps = s.tracks.filter((t, i) => i > 0 && t.start_sec - s.tracks[i - 1].end_sec > 120).length;
+    </tr>`;
+  }).join('');
+  const target = cfg?.export?.target === 'server' ? `op de server: ${esc(cfg.export.dir || cfg.exportDefault || '/exports')}` : window.isSecureContext ? 'via de opslaan-dialoog van de browser' : 'download naar Downloads (geen HTTPS)';
+  const kpi = (n, label, cls, key, tip, act = '') => `<button class="kpi ${n ? cls : 'muted'} ${highlight === key ? 'on' : ''}" data-hl="${key}" title="${tip}"><b>${n}</b> ${label}${act}</button>`;
   el.innerHTML = `
+    ${s.status === 'fout' ? `<div class="notice fout"><span>⚠</span><span class="msg"><b>Scan mislukt.</b> ${esc(s.error || '')}</span><button class="btn sm" data-requeue>Opnieuw scannen</button></div>` : ''}
+    ${s.status === 'gestopt' ? `<div class="notice gestopt"><span>⏸</span><span class="msg"><b>Scan gestopt</b> — dit is een deelresultaat tot ${fmt(posOf(s.log.filter(l => l.timestamp).at(-1) || {}))}.</span><button class="btn sm" data-requeue>Opnieuw scannen</button></div>` : ''}
+    ${tr.length ? resultTimeline(s) : ''}
     <div class="toolbar">
-      <span class="meta"><b>${s.tracks.length}</b> ${s.tracks.length === 1 ? 'track' : 'tracks'} · duur <b>${fmt(s.duration)}</b> · stap <b>${s.step || state.step} s</b>${s.status === 'gestopt' ? ' · <span class="warn">scan gestopt, deelresultaat</span>' : ''}${s.status === 'fout' ? ` · <span class="warn">fout: ${esc(s.error)}</span>` : ''}</span>
-      <button class="btn sm" id="add-track" title="Lege regel toevoegen; vul van/tot en artiest – titel zelf in">+ Track toevoegen</button>
-      <button class="btn sm" id="sort-tracks" title="Sorteer op begintijd">Sorteren</button>
-      ${s.tracks.some(t => t.hits === 1) ? `<button class="btn sm" id="drop-weak" title="Verwijder alle regels die maar 1 keer herkend zijn (gedimd weergegeven); meestal missers tijdens overgangen">1×-missers weg (${s.tracks.filter(t => t.hits === 1).length})</button>` : ''}
-      <span style="width:1px;height:22px;background:var(--border)"></span>
-      <button class="btn sm" data-x="txt" title="Platte tekst: Artiest - Titel  van–tot">Opslaan .txt</button>
-      <button class="btn sm" data-x="csv" title="Komma-gescheiden, opent in Excel/Sheets">Opslaan .csv</button>
-      <button class="btn sm" data-x="json" title="Gestructureerd, inclusief seconden en album/jaar">Opslaan .json</button>
+      <div class="kpis">
+        <span class="kpi"><b>${tr.length}</b> ${tr.length === 1 ? 'track' : 'tracks'}</span>
+        ${tr.length ? kpi(nDoubt, 'twijfel', 'amber', 'doubt', 'Tracks waarvan de begintijd onzeker is (minder dan de helft van de schattingen is het eens) — klik om alleen die te tonen') : ''}
+        ${tr.length ? kpi(nGap, nGap === 1 ? 'gat' : 'gaten', 'red', 'gap', 'Stukken van meer dan 2 minuten zonder herkende track — klik om ze te tonen') : ''}
+        ${tr.length ? kpi(nWeak, '1×', 'amber', 'weak', 'Tracks die maar één keer herkend zijn; meestal missers tijdens een overgang — klik om alleen die te tonen', nWeak ? `<span class="act" data-dropweak title="Alle 1×-missers verwijderen">weg</span>` : '') : ''}
+        ${s.duration ? `<span class="kpi muted" title="Duur van de set · stapgrootte van de scan">${fmt(s.duration)} · stap ${s.step || state.step} s</span>` : ''}
+      </div>
+      <button class="btn sm" id="add-track" title="Lege regel toevoegen; vul van/tot en artiest – titel zelf in">+ Track</button>
+      ${tr.length ? `<details class="menu" id="save-menu"><summary class="btn sm" title="Tracklist opslaan">Opslaan ▾</summary><div class="menu-items">
+        <button data-x="txt">Tekst <small>.txt — Artiest - Titel, van–tot</small></button>
+        <button data-x="csv">Tabel <small>.csv — Excel/Sheets</small></button>
+        <button data-x="json">Data <small>.json — alles, incl. seconden</small></button>
+        <div class="menu-note">Doel: ${target} · <a href="#" data-goto="export" style="color:var(--accent)">wijzigen</a></div></div></details>` : ''}
     </div>
-    ${gaps ? `<div class="warn">${gaps} gat${gaps > 1 ? 'en' : ''} van meer dan 2 minuten zonder herkende track — mogelijk ontbreken daar tracks.</div>` : ''}
-    ${s.tracks.length ? `<table><thead><tr><th>#</th><th title="Begin van de track in de set, op de seconde: berekend uit de offset (positie binnen het originele nummer) van elke herkenning. Zonder offset: eerste herkenning. Oranje = minder dan de helft van de schattingen is het eens: controleer.">Van</th><th title="Begin van de volgende track (op de seconde als die een offset heeft). Bij een lang gat zonder herkenning: laatste herkenning + stap. Laatste track: laatste herkenning + fragmentlengte.">Tot</th><th>Artiest</th><th>Titel</th><th title="Welke herkenningsmethode de track (als eerste) vond">Methode</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+    ${tr.length ? `<table><thead><tr><th class="c-n">#</th><th class="c-t sort" id="sort-tracks" title="Begin van de track in de set, op de seconde (uit de offset van elke herkenning). Oranje = schattingen oneens. Klik om op begintijd te sorteren.">Van ↕</th><th class="c-t" title="Begin van de volgende track (op de seconde als die een offset heeft). Bij een lang gat: laatste herkenning + stap.">Tot</th><th class="c-a">Artiest</th><th>Titel <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">· methode, album, BPM/key</span></th><th class="c-x"></th></tr></thead><tbody>${rows}</tbody></table>`
       : `<div class="empty">Geen tracks herkend. Voeg handmatig toe of scan opnieuw met een kleinere stap.</div>`}
-    ${s.log.length ? `<details><summary style="color:var(--text-3);font-size:12px;cursor:pointer">Scanlog (${plural(s.log.length, 'fragment', 'fragmenten')})</summary><div class="log" style="margin-top:8px">${s.log.map(logLine).join('')}</div></details>` : ''}`;
-
-  el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => exportSet(s, b.dataset.x));
-  $('add-track').onclick = () => {
-    const last = s.tracks[s.tracks.length - 1];
-    s.tracks.push({ id: uid(), start_sec: last ? last.end_sec : 0, end_sec: last ? last.end_sec + 60 : 60, artist: '', title: '', album: '', year: '' });
-    save(); renderAll();
-    const inputs = el.querySelectorAll('tbody tr:last-child input'); inputs[2]?.focus();
-  };
-  $('sort-tracks').onclick = () => { s.tracks.sort((a, b) => a.start_sec - b.start_sec); save(); renderAll(); };
-  const dw = $('drop-weak'); if (dw) dw.onclick = () => {
-    const n = s.tracks.filter(t => t.hits === 1).length;
-    s.tracks = s.tracks.filter(t => t.hits !== 1).sort((a, b) => a.start_sec - b.start_sec);
-    // close the hole a removed stray leaves: previous track ends halfway to the next one (same rule as the scanner)
-    const step = s.step || state.step;
-    s.tracks.forEach((t, i) => { const nx = s.tracks[i + 1]; if (nx && nx.start_sec > t.end_sec && nx.start_sec - t.end_sec <= 3 * step) t.end_sec = nx.exact ? nx.start_sec : Math.round((t.end_sec + nx.start_sec) / 2); });
-    save(); renderAll(); toast(plural(n, 'losse detectie verwijderd', 'losse detecties verwijderd'));
-  };
+    ${s.log.length ? `<details class="sub"><summary>Scanlog (${plural(s.log.length, 'fragment', 'fragmenten')})</summary><div class="log">${s.log.map(logLine).join('')}</div></details>` : ''}`;
+  $('add-track').onclick = () => addTrack(s);
+}
+function addTrack(s, at = null) {
+  const last = s.tracks[s.tracks.length - 1];
+  const t = { id: uid(), start_sec: at != null ? at[0] : last ? last.end_sec : 0, end_sec: at != null ? at[1] : last ? last.end_sec + 60 : 60, artist: '', title: '', album: '', year: '' };
+  s.tracks.push(t); s.tracks.sort((a, b) => a.start_sec - b.start_sec);
+  save(); renderAll();
+  document.querySelector(`tr[data-id="${t.id}"] input[data-f="artist"]`)?.focus();
+}
+function dropWeak(s) {
+  const n = s.tracks.filter(t => t.hits === 1).length;
+  s.tracks = s.tracks.filter(t => t.hits !== 1).sort((a, b) => a.start_sec - b.start_sec);
+  // close the hole a removed stray leaves: previous track ends halfway to the next one (same rule as the scanner)
+  const step = s.step || state.step;
+  s.tracks.forEach((t, i) => { const nx = s.tracks[i + 1]; if (nx && nx.start_sec > t.end_sec && nx.start_sec - t.end_sec <= 3 * step) t.end_sec = nx.exact ? nx.start_sec : Math.round((t.end_sec + nx.start_sec) / 2); });
+  if (highlight === 'weak') highlight = null;
+  save(); renderAll(); toast(plural(n, 'losse detectie verwijderd', 'losse detecties verwijderd'));
 }
 $('result').addEventListener('change', (e) => {
-  const inp = e.target; if (!inp.matches('td input')) return;
-  const s = state.sets.find(s => s.id === state.activeId);
+  const inp = e.target; if (!inp.matches('td input') || inp.readOnly) return;
+  const s = active();
   const t = s.tracks.find(t => t.id === inp.closest('tr').dataset.id);
   const f = inp.dataset.f;
   if (f === 'start_sec' || f === 'end_sec') {
     const sec = parseTime(inp.value);
     if (sec == null) { inp.classList.add('bad'); return; }
     inp.classList.remove('bad'); t[f] = sec; inp.value = fmt(sec);
+    const tl = $('res-tl'); if (tl) tl.outerHTML = resultTimeline(s).split('<div class="tl-axis">')[0];
   } else t[f] = inp.value.trim();
-  save(); renderTabs();
+  save(); renderQueue();
 });
 $('result').addEventListener('click', (e) => {
-  const del = e.target.closest('.del'); if (!del) return;
-  const s = state.sets.find(s => s.id === state.activeId);
-  s.tracks = s.tracks.filter(t => t.id !== del.closest('tr').dataset.id);
-  save(); renderAll();
+  const s = active(); if (!s) return;
+  const del = e.target.closest('.del');
+  if (del) { s.tracks = s.tracks.filter(t => t.id !== del.closest('tr').dataset.id); save(); return renderAll(); }
+  if (e.target.closest('[data-requeue]')) return requeueSet(s.id);
+  if (e.target.closest('[data-dropweak]')) { e.stopPropagation(); return dropWeak(s); }
+  const hl = e.target.closest('[data-hl]');
+  if (hl) { const k = hl.dataset.hl; highlight = highlight === k ? null : (+hl.querySelector('b').textContent ? k : null); return renderResult(); }
+  const x = e.target.closest('[data-x]');
+  if (x) { $('save-menu')?.removeAttribute('open'); return exportSet(s, x.dataset.x); }
+  if (e.target.closest('[data-goto]')) { e.preventDefault(); setView('settings'); setTimeout(() => $('sec-export')?.scrollIntoView({ behavior: 'smooth' }), 50); return; }
+  if (e.target.id === 'sort-tracks' || e.target.closest('#sort-tracks')) { s.tracks.sort((a, b) => a.start_sec - b.start_sec); save(); return renderResult(); }
+  const gap = e.target.closest('[data-gap]');
+  if (gap) { const i = +gap.dataset.gap; return addTrack(s, [s.tracks[i - 1].end_sec, s.tracks[i].start_sec]); }
+  const blk = e.target.closest('.blk[data-row]');
+  if (blk) { const row = document.querySelector(`tr[data-id="${blk.dataset.row}"]`); if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.add('hl'); setTimeout(() => row.classList.remove('hl'), 1200); } }
 });
+document.addEventListener('click', (e) => { const m = $('save-menu'); if (m && m.open && !m.contains(e.target)) m.removeAttribute('open'); });
 
 // ------------------------------------------------------------------ export
 function exportSet(s, kind) {
@@ -583,8 +760,9 @@ async function saveFile(name, body, mime, ext) {
 let cfg = null;            // /api/methods payload
 const openCards = new Set();
 const ST_LABEL = { ok: 'Klaar', key: 'Sleutel ontbreekt', tool: 'Niet geïnstalleerd', index: 'Index leeg', na: 'Niet mogelijk' };
+const stShort = (m) => m.state === 'tool' && /worker/i.test(m.msg) ? 'Worker weg' : m.state === 'key' ? 'Sleutel' : m.state === 'ok' && /beperkt/i.test(m.msg) ? 'Beperkt' : ST_LABEL[m.state] || m.msg;
 const GROUPS = [
-  ['chain', 'Herkenningsketen', 'Per fragment probeert Setscout de actieve methodes van boven naar beneden; de eerste die een track vindt, wint. Ook tracklists (Referentie) kunnen overal staan: bovenaan wordt de tracklist eerst overgenomen en gaan alleen "ID"-tracks en stukken zonder cue naar de methodes eronder; onderaan vult hij alleen wat de rest niet vond. Sleep aan ⋮⋮ (of pijltjestoetsen) om de volgorde te wijzigen.'],
+  ['chain', 'Herkenningsketen', 'Per fragment probeert Setscout de actieve methodes van boven naar beneden; de eerste die een track vindt, wint. Tracklists (Referentie) kunnen overal staan: bovenaan wordt de tracklist eerst overgenomen en gaan alleen "ID"-tracks en stukken zonder cue naar de methodes eronder; onderaan vult hij alleen wat de rest niet vond. Sleep aan ⋮⋮ (of pijltjestoetsen) om de volgorde te wijzigen.'],
   ['enrich', 'Verrijking', 'Herkennen zelf niets: voegen metadata of analyse toe aan elke gevonden track.'],
   ['none', 'Niet mogelijk (nu)', 'Onderzocht maar niet te bouwen zonder eigen werk of hardware; reden in de tooltip.'],
 ];
@@ -608,10 +786,10 @@ const chain = () => cfg ? cfg.methods.filter(m => inChain(m) && m.values.enabled
 function renderChainPill() {
   const p = $('chain-pill'); if (!p || !cfg) return;
   const on = chain(), ready = on.filter(m => m.state === 'ok');
-  p.className = 'pill ' + (ready.length ? 'ok' : 'bad');
+  p.className = 'pill ' + (ready.length ? (ready.length < on.length ? 'warn' : 'ok') : 'bad');
   p.textContent = `keten: ${ready.map(m => m.label).join(' → ') || 'leeg'}`;
   p.title = 'Herkenningsketen (pipeline): volgorde waarin elk fragment wordt geprobeerd. ' +
-    (on.length > ready.length ? `Niet klaar en dus overgeslagen: ${on.filter(m => m.state !== 'ok').map(m => `${m.label} (${ST_LABEL[m.state]})`).join(', ')}. ` : '') + 'Wijzigen onder Instellingen.';
+    (on.length > ready.length ? `Niet klaar en dus overgeslagen: ${on.filter(m => m.state !== 'ok').map(m => `${m.label} (${ST_LABEL[m.state]})`).join(', ')}. ` : '') + 'Klik om te wijzigen.';
 }
 
 function fieldHtml(m, f) {
@@ -629,53 +807,66 @@ function fieldHtml(m, f) {
 function cardHtml(m, pos) {
   if (m.group === 'none') return `<div class="mcard na" data-id="${m.id}"><div class="mname"><b title="${esc(m.tip)}">${esc(m.label)}</b></div><span class="st" title="${esc(m.tip)}">${esc(m.msg)}</span></div>`;
   const on = m.values.enabled, open = openCards.has(m.id);
-  return `<div class="mcard ${on ? '' : 'off'}" data-id="${m.id}">
+  const kindTip = m.local ? 'Eigen collectie: fingerprint van je eigen muziekbestanden (index onder Collectie)' : m.kind === 'Cloud' ? 'Cloud: online dienst met eigen database; het fragment wordt geüpload' : m.group === 'reference' ? 'Referentie: bestaande tracklist van de set' : esc(m.kind);
+  return `<div class="mcard ${m.state} ${on ? '' : 'off'}" data-id="${m.id}">
     <button class="grip" aria-label="Verplaats ${esc(m.label)}" title="Sleep om de volgorde te wijzigen (of focus en ↑/↓)">⋮⋮</button>
     <span class="pos" title="${on ? 'Positie in de keten' : 'Uit'}">${on && inChain(m) ? pos : ''}</span>
     <label class="switch" title="${on ? 'Aan — klik om uit te zetten' : 'Uit — klik om aan te zetten'}"><input type="checkbox" data-act="toggle" ${on ? 'checked' : ''} aria-label="${esc(m.label)} aan/uit"><i></i></label>
-    <div class="mname"><b title="${esc(m.tip)}">${esc(m.label)}</b><span class="mtag" title="${m.local ? 'Fingerprint van je eigen muziekbestanden (index onder Collectie)' : m.kind === 'Cloud' ? 'Online dienst met eigen database; het fragment wordt geüpload' : esc(m.kind)}">${esc(m.kind)}</span></div>
-    <span class="st ${m.state}" data-st="${m.id}" title="${esc(m.install || m.msg)}">${esc(m.msg)}</span>
+    <div class="mname"><b title="${esc(m.tip)}">${esc(m.label)}</b><span class="kind fam-${famOfKind(m)}" title="${kindTip}"><i></i>${esc(m.kind)}</span></div>
+    <span class="stwrap"><span class="st ${m.state}" data-st="${m.id}" title="${esc(m.msg)}${m.install ? ' — ' + esc(m.install) : ''}">${esc(stShort(m))}</span>${m.state === 'index' ? '<a class="st link" href="#sec-collectie" title="Naar Collectie: index bijwerken">→ Collectie</a>' : ''}</span>
     <button class="ibtn" data-act="expand" title="${open ? 'Instellingen inklappen' : 'Instellingen tonen'}" aria-expanded="${open}" ${!m.fields.length && !m.install ? 'disabled style="opacity:.3"' : ''}>${open ? '▴' : '▾'}</button>
     ${open ? `<div class="mfields"><div class="tipline">${esc(m.tip)}</div>${m.fields.map(f => fieldHtml(m, f)).join('')}${m.install ? `<div class="install" title="${m.state === 'key' ? 'Waar je de sleutel haalt' : 'Exacte installatie-instructie'}">${m.state === 'key' ? 'Sleutel' : 'Installeren'}: ${esc(m.install)}</div>` : ''}</div>` : ''}
   </div>`;
 }
 
+function chainStrip() {
+  const on = chain();
+  if (!on.length) return `<div class="strip"><span class="lbl">Keten</span><span class="st tool">leeg — zet een methode aan</span></div>`;
+  return `<div class="strip"><span class="lbl" title="Volgorde waarin elk fragment wordt geprobeerd; gestreept = staat aan maar is niet klaar en wordt overgeslagen">Keten</span>${on.map(m =>
+    `<button class="chipm ${m.state === 'ok' ? '' : 'skip'}" data-goto-card="${m.id}" title="${esc(m.msg)} — klik om de kaart te openen"><i class="sdot ${m.state}"></i>${esc(m.label)}</button>`).join('<span class="arrow">→</span>')}<span class="arrow">→</span><span class="end" title="Niets gevonden: fragment blijft onbekend">?</span></div>`;
+}
+
 function renderSettings() {
   const el = $('settings-body');
   if (!cfg) { el.innerHTML = '<div class="empty">Instellingen laden…</div>'; return; }
+  const on = chain(), notReady = on.filter(m => m.state !== 'ok').length;
+  const c = cfg.collection, ex = cfg.export;
+  const locals = cfg.methods.filter(m => m.local && m.values.enabled);
+  $('subnav').innerHTML = `
+    <a href="#sec-chain">Keten <b class="${!on.length || notReady === on.length ? 'red' : notReady ? 'amber' : 'ok'}">${on.length - notReady}/${on.length}</b></a>
+    <a href="#sec-enrich">Verrijking <b>${cfg.methods.filter(m => m.group === 'enrich' && m.values.enabled).length}</b></a>
+    <a href="#sec-collectie">Collectie <b class="${c.roots.length ? '' : 'amber'}">${plural(c.roots.length, 'map', 'mappen')}</b></a>
+    <a href="#sec-export">Export <b>${ex.target === 'server' ? 'server' : 'browser'}</b></a>`;
   let html = '';
   for (const [g, title, tip] of GROUPS) {
     const list = cfg.methods.filter(m => g === 'chain' ? inChain(m) : m.group === g);
-    if (!list.length) continue; // e.g. nothing left under "Niet mogelijk"
+    if (!list.length) continue;
     let pos = 0;
-    html += `<h2><abbr title="${esc(tip)}">${title}</abbr>${g === 'chain' ? `<small>${chain().length} actief</small>` : ''}</h2>
+    html += `<h2 id="sec-${g}"><abbr title="${esc(tip)}">${title}</abbr>${g === 'chain' ? `<small>${on.length} aan${notReady ? ` · <span style="color:var(--amber)">${notReady} niet klaar</span>` : ''}</small>` : ''}</h2>
+      ${g === 'chain' ? chainStrip() : ''}
       <div class="mlist" data-group="${g}">${list.map(m => cardHtml(m, m.values.enabled ? ++pos : 0)).join('')}</div>`;
   }
-  const c = cfg.collection;
-  const locals = cfg.methods.filter(m => m.local);
-  html += `<h2><abbr title="Methodes met het label 'Eigen collectie' herkennen alleen tracks die in jouw muziekmappen staan. Daarvoor bouwt Setscout eerst een index (fingerprint-database) in de map data/index.">Collectie</abbr><small>${plural(c.roots.length, 'map', 'mappen')}</small></h2>
+  html += `<h2 id="sec-collectie"><abbr title="Methodes met het label 'Eigen collectie' herkennen alleen tracks die in jouw muziekmappen staan. Daarvoor bouwt Setscout eerst een index (fingerprint-database) in de map data/index.">Collectie</abbr><small>${plural(c.roots.length, 'map', 'mappen')}</small></h2>
     <div class="box">
-      <div class="chips">${c.roots.map(r => `<span class="chip">${esc(r)}<button data-rmroot="${esc(r)}" title="Map uit de collectie halen (index blijft staan)">✕</button></span>`).join('') || '<span class="row">Nog geen muziekmappen gekozen.</span>'}</div>
+      <div class="chips">${c.roots.map(r => `<span class="chip">${esc(r)}<button data-rmroot="${esc(r)}" title="Map uit de collectie halen (index blijft staan)">✕</button></span>`).join('') || '<span class="row">Nog geen muziekmappen gekozen — blader links naar je muziekmap en klik op "+ Huidige map".</span>'}</div>
       <div class="row">
-        <button class="btn sm" id="add-root" title="Voeg de map toe die nu links in de bestandsbrowser open staat">+ Huidige map toevoegen</button>
+        <button class="btn sm" id="add-root" title="Voeg de map toe die nu links in de bestandsbrowser open staat">+ Huidige map</button>
         <span class="sfield"><abbr title="Aantal CPU-threads dat de fingerprint-tools tegelijk mogen gebruiken bij het indexeren (Olaf --threads, audfprint --ncores). Hoger = sneller, maar zwaarder voor de NAS.">Threads</abbr><input type="number" min="1" max="64" id="threads" value="${c.threads}"></span>
         <span style="flex:1"></span>
-        <button class="btn sm primary" id="index-start" title="Nieuwe en gewijzigde bestanden toevoegen aan de index van elke actieve 'Eigen collectie'-methode">Index bijwerken</button>
+        <button class="btn sm primary" id="index-start" title="Nieuwe en gewijzigde bestanden toevoegen aan de index van elke actieve 'Eigen collectie'-methode" ${indexEs ? 'disabled' : ''}>Index bijwerken</button>
         <button class="btn sm danger" id="index-stop" title="Indexeren stoppen; wat al geïndexeerd is blijft" ${indexEs ? '' : 'disabled'}>Stop</button>
       </div>
-      <div class="row">${locals.map(m => `<span class="st ${m.state}" title="${esc(m.install || m.msg)}">${esc(m.label)}: ${esc(m.msg)}</span>`).join('')}</div>
+      ${locals.length ? `<div class="locals">${locals.map(m => `<div><i class="sdot ${m.state}"></i><span>${esc(m.label)}</span><span class="n" title="${esc(m.msg)}">${esc(m.msg.replace(/^Klaar · /, ''))}</span></div>`).join('')}</div>` : '<div class="row" style="color:var(--text-3)">Geen "Eigen collectie"-methode aan: indexeren doet nu niets.</div>'}
       <div class="progress" id="index-bar" ${indexEs ? '' : 'hidden'}><i style="width:0%"></i></div>
-      <div class="log" id="index-log" ${indexLog.length ? '' : 'hidden'}>${indexLog.join('')}</div>
+      <details class="sub" ${indexLog.length ? 'open' : ''} ${indexLog.length ? '' : 'hidden'} id="index-details"><summary>Indexlog</summary><div class="log" id="index-log">${indexLog.join('')}</div></details>
     </div>`;
-  const ex = cfg.export;
-  html += `<h2><abbr title="Waar de knoppen Opslaan .txt/.csv/.json het bestand neerzetten.">Export</abbr></h2>
+  html += `<h2 id="sec-export"><abbr title="Waar de knop Opslaan het bestand neerzet.">Export</abbr></h2>
     <div class="box">
       <div class="row">
-        <label class="sfield"><input type="radio" name="ext" value="browser" ${ex.target !== 'server' ? 'checked' : ''} style="width:auto"> <abbr title="Opslaan-dialoog van de browser. Werkt alleen via localhost of HTTPS (secure context); anders gewone download naar de map Downloads.">In de browser</abbr></label>
-        <label class="sfield"><input type="radio" name="ext" value="server" ${ex.target === 'server' ? 'checked' : ''} style="width:auto"> <abbr title="Setscout schrijft het bestand op de server/NAS zelf. Handig in Docker/TrueNAS via http://ip:poort.">Op de server</abbr></label>
+        <span class="seg"><button data-ext="browser" class="${ex.target !== 'server' ? 'on' : ''}" title="Opslaan-dialoog van de browser. Werkt alleen via localhost of HTTPS (secure context); anders gewone download naar de map Downloads.">In de browser</button><button data-ext="server" class="${ex.target === 'server' ? 'on' : ''}" title="Setscout schrijft het bestand op de server/NAS zelf. Handig in Docker/TrueNAS via http://ip:poort.">Op de server</button></span>
+        <span class="sfield"><abbr title="Leeg = standaardmap. Moet binnen de toegestane mappen liggen.">Map</abbr><input class="wide" id="export-dir" spellcheck="false" placeholder="${esc(cfg.exportDefault)}" value="${esc(ex.dir)}" style="width:320px;text-align:left"></span>
+        <button class="btn sm" id="export-here" title="Gebruik de map die links in de bestandsbrowser open staat">Huidige map</button>
       </div>
-      <div class="row"><span class="sfield"><abbr title="Leeg = standaardmap. Moet binnen de toegestane mappen liggen.">Map</abbr><input class="wide" id="export-dir" spellcheck="false" placeholder="${esc(cfg.exportDefault)}" value="${esc(ex.dir)}" style="width:320px;text-align:left"></span>
-      <button class="btn sm" id="export-here" title="Gebruik de map die links in de bestandsbrowser open staat">Huidige map</button></div>
       ${!window.isSecureContext && ex.target !== 'server' ? '<div class="warn">Deze pagina is niet via HTTPS/localhost geopend: de browser-dialoog werkt niet, exports gaan naar Downloads. Kies "Op de server" om op de NAS op te slaan.</div>' : ''}
     </div>`;
   // full re-render replaces the inputs → put focus back where the user is now (e.g. after Tab)
@@ -685,7 +876,7 @@ function renderSettings() {
   back?.focus();
 }
 function updateStatusPills() {
-  for (const m of cfg.methods) { const p = document.querySelector(`[data-st="${m.id}"]`); if (p) { p.className = `st ${m.state}`; p.textContent = m.msg; p.title = m.install || m.msg; } }
+  for (const m of cfg.methods) { const p = document.querySelector(`[data-st="${m.id}"]`); if (p) { p.className = `st ${m.state}`; p.textContent = stShort(m); p.title = m.msg + (m.install ? ' — ' + m.install : ''); } }
   const th = $('threads'); if (th) th.value = cfg.collection.threads; // server clamps 1–64
 }
 
@@ -701,14 +892,16 @@ sb.addEventListener('change', (e) => {
     return saveSettings(methodPatch(id, { [t.dataset.key]: t.value }), isSecret);
   }
   if (t.id === 'threads') return saveSettings({ collection: { threads: t.value } }, false);
-  if (t.name === 'ext') return saveSettings({ export: { target: t.value } });
   if (t.id === 'export-dir') return saveSettings({ export: { dir: t.value.trim() } });
 });
 sb.addEventListener('click', (e) => {
   const t = e.target, id = cardId(e);
   if (t.closest('[data-act="expand"]')) { openCards.has(id) ? openCards.delete(id) : openCards.add(id); return renderSettings(); }
+  const goto = t.closest('[data-goto-card]');
+  if (goto) { openCards.add(goto.dataset.gotoCard); renderSettings(); const c = sb.querySelector(`.mcard[data-id="${goto.dataset.gotoCard}"]`); c?.scrollIntoView({ behavior: 'smooth', block: 'center' }); c?.classList.add('flash'); setTimeout(() => c?.classList.remove('flash'), 1200); return; }
   if (t.dataset.clear) return saveSettings(methodPatch(id, { [t.dataset.clear]: null }));
   if (t.dataset.rmroot) return saveSettings({ collection: { roots: cfg.collection.roots.filter(r => r !== t.dataset.rmroot) } });
+  if (t.dataset.ext) return saveSettings({ export: { target: t.dataset.ext } });
   if (t.id === 'add-root') {
     if (!browsePath) return toast('Open links eerst een map in de bestandsbrowser', true);
     return saveSettings({ collection: { roots: [...cfg.collection.roots, browsePath] } });
@@ -755,7 +948,8 @@ function startIndex() {
   renderSettings();
   const logIt = (cls, txt) => {
     indexLog.push(`<div><span class="ts"></span><span class="${cls}">${cls === 'err' ? '!' : '·'}</span><span class="${cls}">${esc(txt)}</span></div>`);
-    const l = $('index-log'); if (l) { l.hidden = false; l.insertAdjacentHTML('beforeend', indexLog[indexLog.length - 1]); l.scrollTop = l.scrollHeight; }
+    const d = $('index-details'); if (d) { d.hidden = false; d.open = true; }
+    const l = $('index-log'); if (l) { l.insertAdjacentHTML('beforeend', indexLog[indexLog.length - 1]); l.scrollTop = l.scrollHeight; }
   };
   indexEs.addEventListener('progress', (e) => {
     const p = JSON.parse(e.data);
@@ -789,7 +983,7 @@ function setView(v) {
 $('view-btn').onclick = () => setView(state.view === 'settings' ? 'scan' : 'settings');
 
 // ------------------------------------------------------------------ boot
-function renderAll() { renderQueue(); renderTabs(); renderResult(); }
+function renderAll() { renderQueue(); renderResult(); }
 setView(state.view || 'scan');
 renderAll();
 window.addEventListener('beforeunload', (e) => { if (running) { e.preventDefault(); e.returnValue = ''; } });
