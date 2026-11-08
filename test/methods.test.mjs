@@ -209,7 +209,7 @@ await test('referentie: 1001Tracklists parse + nette fout bij blokkade', async (
   globalThis.fetch = async (url, o = {}) => {
     calls.push({ url, method: o.method || 'GET', body: o.body?.toString(), cookie: o.headers?.Cookie, referer: o.headers?.Referer });
     if (url.endsWith('.com/')) return { headers: { getSetCookie: () => ['guid=abc; Path=/; HttpOnly', 'uid=1; Path=/'] }, text: async () => '' };
-    return { text: async () => url.includes('/search/') ? '<a href="/tracklist/abc/set.html">x</a>' : page };
+    return { text: async () => url.includes('/search/') ? '<a href="/tracklist/zz/other-dj-boiler-room.html">x</a><a href="/tracklist/abc/andhim-das-festival-germany-2026.html">x</a>' : page };
   };
   const list = await byId['1001tl'].tracklist('Andhim (Full Set) - komm schon Alter, Das Festival 2026 [AbCdEfGhIjK].webm', {});
   assert.deepEqual(list, [{ start_sec: 3723, artist: 'Artist One', title: 'Song & Co', unknown: false }, { start_sec: 300, artist: 'Two', title: 'B', unknown: false }, { start_sec: 480, artist: 'ID', title: 'ID', unknown: true }]);
@@ -217,12 +217,16 @@ await test('referentie: 1001Tracklists parse + nette fout bij blokkade', async (
   assert.equal(calls[1].method, 'POST');
   assert.equal(calls[1].body, 'main_search=Andhim+komm+schon+Alter+Das+Festival+2026&search_selection=9');
   assert.equal(calls[1].cookie, 'guid=abc; uid=1');
-  assert.equal(calls[2].url, 'https://www.1001tracklists.com/tracklist/abc/set.html');
+  assert.equal(calls[2].url, 'https://www.1001tracklists.com/tracklist/abc/andhim-das-festival-germany-2026.html', 'beste match, niet de eerste link');
   assert.equal(calls[2].referer, 'https://www.1001tracklists.com/search/result.php');
   globalThis.fetch = async () => ({ text: async () => 'Please wait, you will be forwarded' });
   await assert.rejects(byId['1001tl'].tracklist('x.mp3', {}), /geblokkeerd/);
   globalThis.fetch = async () => ({ text: async () => '<html>no results</html>' });
-  await assert.rejects(byId['1001tl'].tracklist('x.mp3', { query: 'Andhim Das Festival' }), /geen tracklist gevonden voor "Andhim Das Festival"/);
+  await assert.rejects(byId['1001tl'].tracklist('x.mp3', { query: 'Andhim Das Festival' }), /geen passende tracklist gevonden voor "Andhim Das Festival"/);
+  // Cloudflare Turnstile op de tracklistpagina: nette melding mét de gevonden link, geen poging om hem te omzeilen
+  globalThis.fetch = async (url) => ({ text: async () => url.includes('/search/') ? '<a href="/tracklist/q1/andhim-das-festival.html">x</a>' : '<form method="POST"><input type="hidden" name="captcha" value="1"><div id="turnstile-container"></div></form><script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>' });
+  await assert.rejects(byId['1001tl'].tracklist('x.mp3', { query: 'Andhim Das Festival' }),
+    (e) => e.message.includes('tracklist gevonden (https://www.1001tracklists.com/tracklist/q1/andhim-das-festival.html)') && e.message.includes('Turnstile'));
 });
 
 await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor ID/vóór eerste cue; Van = cue', async () => {
