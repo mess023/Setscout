@@ -50,5 +50,7 @@ TrueNAS bewaart en start de compose-YAML zelf. Daarom werkt `docker compose --pr
 |---|---|
 | `Segmentation fault … emulator` (vaak bij Play Store/Chrome) | Opgelost in het startscript (Vulkan uit). Bouw `setscout-android:latest` opnieuw (stap 2) |
 | `Daemon startup failed` (pulseaudio) in een lus | Opgelost: het startscript ruimt oude PulseAudio-bestanden op. Opnieuw bouwen (stap 2) |
-| `Could not init 'pa' audio driver` | De virtuele microfoon werkt dan niet. Het startscript start de emulator nu zonder `-no-window` (Qt "offscreen"), want alleen die variant heeft PulseAudio |
-| Emulator start niet meer na de update | Zet bij `android` de environment-variabele `EMULATOR_WINDOW: none` (oude headless-modus, zonder microfoon) en meld het |
+| `Could not init 'pa' audio driver` | De virtuele microfoon werkt dan niet. Het startscript start de emulator daarom in venstermodus op een virtueel scherm (Xvfb), want alleen die variant heeft PulseAudio. Komt de regel toch terug: controleer dat `EMULATOR_WINDOW` **niet** op `none` staat |
+| `cannot get x11 display info` + `Segmentation fault` kort na de start | Er was geen (virtueel) scherm. Opgelost met Xvfb; opnieuw bouwen (stap 2) |
+| `Running multiple emulators with the same AVD` | Oude lock-bestanden na een crash. Het startscript ruimt die nu op; opnieuw bouwen (stap 2) |
+| Emulator start niet meer na de update | Zet bij `android` tijdelijk `EMULATOR_WINDOW: none` (headless, **zonder microfoon**) en stuur de log |

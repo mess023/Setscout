@@ -8,7 +8,8 @@ ARG BASE=setscout-android-base:latest
 FROM ${BASE}
 
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils \
+# xvfb: virtual X display, so the emulator can run its windowed build (the headless one has no working audio)
+RUN apt-get update && apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils xvfb \
     && rm -rf /var/lib/apt/lists/*
 COPY start-with-virtmic.sh /opt/start-with-virtmic.sh
 RUN chmod +x /opt/start-with-virtmic.sh
