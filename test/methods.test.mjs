@@ -381,6 +381,23 @@ await test('Google zoekresultatenpagina: zoekvak = resultaat; artiest/titel gesp
   assert.equal(M.parseSoundSearch('<hierarchy><node text="Listening…" resource-id="x"/></hierarchy>', cfg).title, undefined);
 });
 
+await test('versie uit andere methode: Google "Broken Glass" + Shazam "Broken Glass (Helsloot Remix)" = één track, specifieke versie', () => {
+  const G = { artist: 'Booka Shade', title: 'Broken Glass', method: 'Google', versions: 'Broken Glass (Helsloot Remix) | Broken Glass (Helsloot Extended Remix)' };
+  const S = { artist: 'Booka Shade', title: 'Broken Glass (Helsloot Remix)', method: 'Shazam', album: 'Broken Glass Remixes' };
+  const segs = [{ pos: 0, match: G }, { pos: 30, match: S }, { pos: 60, match: G }, { pos: 90, match: { ...G, artist: '', title: 'Booka Shade Broken Glass' } }, { pos: 120, match: { artist: 'X', title: 'Next', method: 'Shazam' } }];
+  const r = toRanges(segs, 12, 30);
+  assert.deepEqual(r.map(t => [t.artist, t.title, t.method, t.hits]), [['Booka Shade', 'Broken Glass (Helsloot Remix)', 'Shazam + Google', 4], ['X', 'Next', 'Shazam', 1]]);
+  assert.equal(r[0].album, 'Broken Glass Remixes'); assert.ok(!('versions' in r[0]), 'hint opgelost');
+  // without a versioned detection from another method: Google's hint stays
+  const g = toRanges([{ pos: 0, match: G }, { pos: 30, match: G }], 12, 30);
+  assert.deepEqual([g[0].title, g[0].method, g[0].versions], ['Broken Glass', 'Google', G.versions]);
+  // two non-Google methods: original and remix stay separate tracks (a DJ can play both)
+  const two = toRanges([{ pos: 0, match: { ...S, title: 'Broken Glass' } }, { pos: 30, match: S }], 12, 30);
+  assert.equal(two.length, 2);
+  // a different song by the same artist is never merged
+  assert.equal(toRanges([{ pos: 0, match: G }, { pos: 30, match: { ...S, title: 'Body Language (Remix)' } }], 12, 30).length, 2);
+});
+
 await test('Google: versies op de resultatenpagina als hint (niet automatisch gekozen)', async () => {
   const cfg = effectiveSettings().methods.google;
   const page = srp('Booka Shade Broken Glass',
