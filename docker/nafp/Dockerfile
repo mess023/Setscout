@@ -7,8 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg sox curl
     && rm -rf /var/lib/apt/lists/*
 
 # versions from the project's environment.yml (TF 2.15.1, kapre 0.3.7, numpy < 2), CPU builds
-RUN pip install --no-cache-dir "tensorflow-cpu==2.15.1" "numpy<2" "kapre==0.3.7" "sox==1.4.1" \
-      "faiss-cpu==1.8.0.post1" pyyaml pandas matplotlib click
+# kapre 0.3.7's metadata claims numpy>=2, which conflicts with TF 2.15 (numpy<2) → install it without deps
+RUN pip install --no-cache-dir "tensorflow-cpu==2.15.1" "numpy<2" "sox==1.4.1" \
+      "faiss-cpu==1.8.0.post1" pyyaml pandas matplotlib click \
+    && pip install --no-cache-dir --no-deps "kapre==0.3.7"
 
 ARG PEAKNETFP_COMMIT=d55071a644f20fd6448fb8ed33c0c115769fb7a5
 RUN mkdir -p /opt/peaknetfp \
