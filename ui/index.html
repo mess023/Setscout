@@ -394,7 +394,9 @@ function runNext() {
   es.addEventListener('note', (e) => { const d = JSON.parse(e.data); const l = { timestamp: '', status: 'note', message: d.message }; s.log.push(l); appendLog(s, { ...l, pct: s.pct }); });
   es.addEventListener('done', (e) => {
     const d = JSON.parse(e.data);
-    for (const r of d.reference || []) s.log.push({ timestamp: '', status: r.error ? 'error' : 'note', message: r.error ? `${r.method}: ${r.error}` : `${r.method}: ${plural(r.filled, 'fragment', 'fragmenten')} aangevuld uit ${plural(r.tracks, 'track', 'tracks')}` });
+    for (const r of d.reference || []) s.log.push({ timestamp: '', status: r.error ? 'error' : 'note', message: r.error ? `${r.method}: ${r.error}` : r.untimed
+      ? `${r.method}: lijst zonder tijden (${plural(r.tracks, 'track', 'tracks')}): ${r.confirmed} herkende tracks staan erin, ${plural(r.filled, 'fragment', 'fragmenten')} op volgorde aangevuld`
+      : `${r.method}: ${plural(r.filled, 'fragment', 'fragmenten')} aangevuld uit ${plural(r.tracks, 'track', 'tracks')}` });
     s.tracks = d.tracks.map(normalize); s.duration = d.duration;
     s.status = d.aborted ? 'gestopt' : 'klaar'; s.pct = 100;
     es.close(); es = null; save(); renderAll();

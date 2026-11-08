@@ -283,7 +283,7 @@ await test('YouTube: hoofdstukken > beste comment (meeste regels, vastgepind); I
   await m.tracklist('Andhim - Das Festival 2026.mp3', cfg);
   assert.equal(calls[1], 'ytsearch1:Andhim Das Festival 2026');
   api.run = async () => ({ code: 0, stdout: JSON.stringify({ title: 'Kale set', comments: [{ text: 'NICE SET' }] }), stderr: '' });
-  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /geen tracklist met tijden gevonden bij "Kale set".*1 comments/);
+  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /geen tracklist gevonden bij "Kale set".*1 comments/);
   api.run = async () => ({ code: 1, stdout: '', stderr: 'ERROR: Video unavailable' });
   await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /yt-dlp: ERROR: Video unavailable/);
 });
@@ -334,6 +334,42 @@ await test('NAFP/PeakNetFP: HTTP-worker index + query (gemockt), drempel, tags; 
   globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ error: 'FileNotFoundError: checkpoint' }) });
   await assert.rejects(byId.nafp.local.queryFn(Buffer.from('x'), cfg), /NeuralFP \(NAFP\)-worker: FileNotFoundError: checkpoint/);
   assert.equal(byId.nafp.status({ ...cfg, url: 'http://127.0.0.1:1' }).state, 'tool', 'geen worker → niet bereikbaar');
+});
+
+await test('tracklist zonder tijden: herkend (nummering, labels), lager dan een lijst met tijden', () => {
+  const comment = 'Tracklist:\n1. Victor Vera - Pressure (Daniel Sbert Remix)\n2. CS - What We Had [Label]\n3) Deco - New Day\n- Mini Elefant – Volador\nID - ID\nwat een set!';
+  assert.deepEqual(M.parseUntimedLines(comment).map(t => [t.artist, t.title, t.unknown]), [
+    ['Victor Vera', 'Pressure (Daniel Sbert Remix)', false], ['CS', 'What We Had', false], ['Deco', 'New Day', false], ['Mini Elefant', 'Volador', false], ['ID', 'ID', true]]);
+  assert.deepEqual(M.parseUntimedLines('A - B\nC - D\nleuk'), [], 'minder dan 4 regels: geen tracklist');
+  const untimed = M.bestYoutubeTracklist({ description: '', comments: [{ text: 'nice' }, { text: comment, like_count: 50 }] });
+  assert.equal(untimed.from, 'comment (zonder tijden)'); assert.equal(untimed.tracks.length, 5);
+  const timed = M.bestYoutubeTracklist({ description: '00:00 A - B\n03:00 C - D\n06:00 E - F', comments: [{ text: comment }] });
+  assert.equal(timed.from, 'beschrijving', 'lijst met tijden gaat voor');
+  assert.deepEqual(M.parseMixesdb('# Aberton - Me Out\n# Jonny Calypso - Teenager 2K15 [Label]\n# ?').map(t => [t.artist, t.title, t.start_sec]), [['Aberton', 'Me Out', undefined], ['Jonny Calypso', 'Teenager 2K15', undefined], ['', '?', undefined]]);
+});
+
+await test('tracklist zonder tijden in de keten: na de scan gaten op volgorde vullen (alleen bij precies één ontbrekend nummer)', async () => {
+  const A = { artist: 'Aberton', title: 'Me Out' }, B = { artist: 'Jonny Calypso', title: 'Teenager 2K15' }, C = { artist: 'CS', title: 'What We Had' },
+    D = { artist: 'Deco', title: 'New Day' }, E = { artist: 'Mini Elefant', title: 'Volador' };
+  const list = [A, B, C, D, E].map(t => ({ ...t, unknown: false }));
+  globalThis.fetch = async (url) => url.includes('list=search')
+    ? jsonRes({ query: { search: [{ title: '2026-05-23 - andhim @ Das Festival, Amsterdam' }] } })
+    : { text: async () => list.map(t => `# ${t.artist} - ${t.title}`).join('\n') };
+  const p = createPipeline(settings({ shazam: { enabled: true }, mixesdb: { enabled: true } }, ['shazam', 'mixesdb']));
+  const sh = (t) => ({ ...t, method: 'Shazam' });
+  const segs = [
+    { pos: 0, match: null },                       // set start, before A? A is list[0] → nothing between: not filled
+    { pos: 30, match: sh(A) }, { pos: 60, match: null }, { pos: 90, match: null },   // A … C: exactly B missing → filled
+    { pos: 120, match: sh({ ...C, title: 'What We Had (Extended Mix)' }) },          // version still counts as C
+    { pos: 150, match: null },                                                        // C … end: D and E missing → not guessed
+  ];
+  const rep = await p.fillGaps('andhim - Das Festival 2026.webm', segs);
+  assert.deepEqual(rep, [{ method: 'MixesDB', untimed: true, tracks: 5, confirmed: 2, filled: 2 }]);
+  assert.deepEqual(segs.map(s => s.match?.title ?? null), [null, 'Me Out', 'Teenager 2K15', 'Teenager 2K15', 'What We Had (Extended Mix)', null]);
+  assert.equal(segs[2].match.method, 'MixesDB (volgorde)');
+  // per fragment an untimed list fills nothing (no times) — the chain goes on
+  api.shazam = async () => null;
+  assert.equal(await createPipeline(settings({ shazam: { enabled: true }, mixesdb: { enabled: true } }, ['mixesdb', 'shazam'])).recognize({ ...ctx(), file: 'andhim - Das Festival 2026.webm', pos: 60 }), null);
 });
 
 await test('verrijking: MusicBrainz vult isrc/album aan, één keer per track (cache)', async () => {
