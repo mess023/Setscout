@@ -1,0 +1,41 @@
+# Setscout — docker compose / TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML.
+# Replace the /mnt/tank/... host paths with your own datasets and set a password.
+services:
+  setscout:
+    image: ghcr.io/mess023/setscout:latest
+    container_name: setscout
+    restart: unless-stopped
+    user: "568:568"            # TrueNAS "apps" user (datasets with the Apps preset). Elsewhere: remove → image default node (1000)
+    ports:
+      - "3847:3847"
+    environment:
+      PORT: "3847"
+      SETSCOUT_PASSWORD: "VERANDER-MIJ"          # required on a LAN: the browser asks for it (any username)
+      HOME: /data/home                           # writable home for tools (adb, caches) when running as 568
+      # ADB_VENDOR_KEYS: /data/adbkey            # only for the optional android service, see docker/android/README.md
+    volumes:
+      - /mnt/tank/apps/setscout:/data            # settings, API keys, indexes (read-write)
+      - /mnt/tank/music:/music:ro                # your music collection (read-only)
+      - /mnt/tank/djsets:/sets:ro                # the mixes to scan (read-only)
+      - /mnt/tank/djsets/tracklists:/exports     # "save on server" exports (read-write)
+
+  # --- Optional: Android emulator for the method 'Google "Zoek een nummer"' (experimental) ---
+  # Starts only with:  docker compose --profile google up -d   (TrueNAS: delete the `profiles:` line to enable)
+  # Needs hardware virtualisation: /dev/kvm on the host (TrueNAS bare metal; in a VM: nested virtualisation).
+  # Not built by CI (many GB). Build it on the NAS first, see docker/android/README.md; log in once with scrcpy.
+  android:
+    profiles: ["google"]
+    build: ./docker/android
+    image: setscout-android:latest
+    container_name: android
+    restart: unless-stopped
+    devices:
+      - /dev/kvm:/dev/kvm
+    environment:
+      MEMORY: "4096"
+      CORES: "2"
+    volumes:
+      - /mnt/tank/apps/setscout-android:/data    # AVD incl. Google login survives restarts
+    ports:
+      - "5555:5555"   # ADB, for the scrcpy login from your PC; Setscout itself uses android:5555 inside compose
+    # 4713 (PulseAudio) stays internal: only Setscout needs it

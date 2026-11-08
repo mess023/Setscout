@@ -1,0 +1,29 @@
+# dependencies, local tools, runtime data
+node_modules/
+.venv/
+tools/*
+!tools/essentia_bpmkey.py
+data/
+.setscout-tmp/
+.claude/
+*.log
+
+# audio/video — never commit mixes or tracks
+*.webm
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.aac
+*.ogg
+*.opus
+*.aiff
+*.wma
+*.mp4
+*.mkv
+*.raw
+
+# generated tracklists of personal sets
+*.cue
+*_tracklist.*
+*tracklist.csv

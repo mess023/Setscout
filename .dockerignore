@@ -1,0 +1,14 @@
+node_modules
+data
+.setscout-tmp
+.venv
+.claude
+test
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.ogg
+*.cue
+*_tracklist.*
+*tracklist.csv
