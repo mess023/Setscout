@@ -129,6 +129,7 @@
   td .del:hover { color: var(--red); background: var(--red-soft); }
   .warn { font-size: 12px; color: var(--amber); }
   .log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); font-family: var(--mono); font-size: 12px; max-height: 220px; overflow: auto; padding: 8px 12px; color: var(--text-2); }
+  .log.live { flex: 1 1 0; max-height: none; min-height: 160px; } /* during a scan: fill the panel down to the bottom, scroll inside */
   .log div { display: grid; grid-template-columns: 70px 16px 1fr; gap: 10px; padding: 2px 0; }
   .log .ts { color: var(--text-3); }
   .log .ok { color: var(--green); } .log .same { color: var(--text-3); } .log .none { color: var(--text-3); } .log .err { color: var(--red); }
@@ -458,7 +459,7 @@ function renderResult() {
     el.innerHTML = `
       <div class="toolbar"><span class="meta" id="scanmeta">${scanMeta(s)}</span><span class="status bezig" id="scanpill">Bezig ${s.pct}%</span></div>
       <div class="progress"><i id="scanpct" style="width:${s.pct}%"></i></div>
-      <div class="log" id="scanlog">${s.log.map(logLine).join('')}</div>`;
+      <div class="log live" id="scanlog">${s.log.map(logLine).join('')}</div>`;
     const log = $('scanlog'); log.scrollTop = log.scrollHeight;
     return;
   }
