@@ -349,7 +349,7 @@ await test('verrijking: MusicBrainz vult isrc/album aan, één keer per track (c
   assert.equal(n, 1);
 });
 
-await test('Google Zoek een nummer: intent → paplay → uiautomator-poll → titel/artiest, terug-toets', async () => {
+await test('Google Zoek een nummer: force-stop → intent → paplay → uiautomator-poll → titel/artiest → force-stop', async () => {
   const xml = (t) => `<?xml version="1.0"?><hierarchy><node text="" resource-id="x:id/root"><node text="Luisteren…" resource-id="com.google:id/status"/>${t}</node></hierarchy>UI hierchary dumped to: /dev/tty`;
   const calls = []; let dumps = 0;
   api.run = async (cmd, args) => {
@@ -361,10 +361,50 @@ await test('Google Zoek een nummer: intent → paplay → uiautomator-poll → t
   const c = { ...ctx(), wav: () => 'frag.wav' };
   const r = await byId.google.recognize(c, cfg);
   assert.deepEqual([r.title, r.artist, r.method], ['Da Funk', 'Daft Punk & Co', 'Google']);
-  assert.match(calls[0], /-s android:5555 shell am start -a com\.google\.android\.googlequicksearchbox\.MUSIC_SEARCH/);
-  assert.equal(calls[1], '--server=tcp:android:4713 --device=virtmic frag.wav');
-  assert.match(calls.at(-1), /keyevent KEYCODE_BACK/);
+  assert.match(calls[0], /-s android:5555 shell am force-stop com\.google\.android\.googlequicksearchbox$/);
+  assert.match(calls[1], /shell am start -a com\.google\.android\.googlequicksearchbox\.MUSIC_SEARCH/);
+  assert.match(calls[2], /uiautomator dump/, 'nulmeting vóór het afspelen');
+  assert.equal(calls[3], '--server=tcp:android:4713 --device=virtmic frag.wav');
+  assert.match(calls.at(-1), /am force-stop/, 'resultatenpagina meteen weer dicht');
   assert.equal(dumps, 2);
+});
+
+// the layout the user saw: no song card, the recognised song lands in the search box of a results page
+const srp = (q, extra = '') => `<hierarchy><node text="${q}" resource-id="com.google.android.googlequicksearchbox:id/googleapp_srp_search_box_text"/><node text="${q} - Google Search" resource-id=""/><node text="All" resource-id=""/><node text="Videos" resource-id=""/>${extra}</hierarchy>`;
+await test('Google zoekresultatenpagina: zoekvak = resultaat; artiest/titel gesplitst via "… - Topic" of "Artiest - …"', () => {
+  const cfg = effectiveSettings().methods.google;
+  const yt = '<node text="" content-desc="Broken Glass – YouTube · Booka Shade - Topic" resource-id=""/><node text="Booka Shade - Broken Glass (Helsloot Remix)" resource-id=""/>';
+  assert.deepEqual((({ artist, title }) => ({ artist, title }))(M.parseSoundSearch(srp('Booka Shade Broken Glass', yt), cfg)), { artist: 'Booka Shade', title: 'Broken Glass' });
+  assert.deepEqual((({ artist, title }) => ({ artist, title }))(M.parseSoundSearch(srp('LINDO PROVIBE Gauteng'), cfg)), { artist: '', title: 'LINDO PROVIBE Gauteng' }, 'zonder hulp op het scherm: alles als titel');
+  const only = '<hierarchy><node text="Moderat Bad Kingdom - Google Search" resource-id=""/></hierarchy>';
+  assert.equal(M.parseSoundSearch(only, cfg).title, 'Moderat Bad Kingdom', 'ook via de "… - Google Search"-titel');
+  assert.equal(M.parseSoundSearch('<hierarchy><node text="Listening…" resource-id="x"/></hierarchy>', cfg).title, undefined);
+});
+
+await test('Google: versies op de resultatenpagina als hint (niet automatisch gekozen)', async () => {
+  const cfg = effectiveSettings().methods.google;
+  const page = srp('Booka Shade Broken Glass',
+    '<node text="Broken Glass" content-desc="Broken Glass – YouTube · Booka Shade - Topic · 5:03"/>' +
+    '<node text="Booka Shade - Broken Glass (Helsloot Remix) [Blaufield Music]" content-desc=""/>' +
+    '<node text="Broken Glass (Helsloot Extended Remix)" content-desc="Booka Shade - Topic · 7:47"/>');
+  const r = M.parseSoundSearch(page, cfg);
+  assert.deepEqual([r.artist, r.title], ['Booka Shade', 'Broken Glass'], 'titel blijft wat Google herkende');
+  assert.deepEqual(r.versions, ['Broken Glass (Helsloot Remix)', 'Broken Glass (Helsloot Extended Remix)']);
+  let d = 0;
+  api.run = async (cmd, args) => ({ code: 0, stdout: args.includes('uiautomator') ? (d++ ? page : '<hierarchy/>') : '', stderr: '' });
+  const m = await byId.google.recognize({ ...ctx(), wav: () => 'f.wav' }, { ...cfg, adb: 'package.json', paplay: 'package.json' });
+  assert.equal(m.versions, 'Broken Glass (Helsloot Remix) | Broken Glass (Helsloot Extended Remix)');
+  assert.equal(M.parseSoundSearch(srp('LINDO PROVIBE Gauteng'), cfg).versions.length, 0);
+});
+
+await test('Google: oud resultaat van het vorige fragment wordt niet als nieuw gelezen', async () => {
+  const screens = [srp('LINDO PROVIBE Gauteng'), srp('LINDO PROVIBE Gauteng'), srp('LINDO PROVIBE Gauteng'), srp('Booka Shade Broken Glass', '<node content-desc="Booka Shade - Topic" text=""/>')];
+  let d = 0;
+  api.run = async (cmd, args) => ({ code: 0, stdout: args.includes('uiautomator') ? screens[Math.min(d++, screens.length - 1)] : '', stderr: '' });
+  const cfg = { ...effectiveSettings().methods.google, adb: 'package.json', paplay: 'package.json', waitSec: 30 };
+  const r = await byId.google.recognize({ ...ctx(), wav: () => 'f.wav' }, cfg);
+  assert.deepEqual([r.artist, r.title], ['Booka Shade', 'Broken Glass']);
+  assert.equal(d, 4, 'nulmeting + 2 keer het oude scherm overgeslagen + het nieuwe');
 });
 
 await test('Google: geen resultaat → fout met zichtbare teksten (voor afstellen); paplay-fout netjes', async () => {

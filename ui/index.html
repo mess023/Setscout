@@ -411,7 +411,7 @@ function runNext() {
   });
 }
 const normalize = (t) => ({ id: uid(), start_sec: t.start_sec, end_sec: t.end_sec, artist: t.artist || '', title: t.title || '', album: t.album || '', year: t.year || '', hits: t.hits ?? null,
-  method: t.method || '', bpm: t.bpm || '', key: t.key || '', isrc: t.isrc || '', mbid: t.mbid || '', label: t.label || '', exact: Boolean(t.exact), spread: t.spread ?? null, agree: t.agree || '' });
+  method: t.method || '', bpm: t.bpm || '', key: t.key || '', isrc: t.isrc || '', mbid: t.mbid || '', label: t.label || '', exact: Boolean(t.exact), spread: t.spread ?? null, agree: t.agree || '', versions: t.versions || '' });
 // exact start where fewer than half of the offset estimates agree → worth a check
 const doubtful = (t) => { if (!t.exact || !t.agree) return false; const [a, n] = t.agree.split('/').map(Number); return a * 2 < n; };
 
@@ -446,7 +446,8 @@ function extraLine(t) {
   const bits = [t.album, t.year, t.label].filter(Boolean).map(esc).concat([
     t.bpm && `<abbr title="Tempo in beats per minute (Essentia)">${esc(t.bpm)} BPM</abbr>`,
     t.key && `<abbr title="Toonsoort (Essentia)">${esc(t.key)}</abbr>`,
-    t.isrc && `<abbr title="ISRC: internationale code van deze opname (MusicBrainz)">${esc(t.isrc)}</abbr>`].filter(Boolean));
+    t.isrc && `<abbr title="ISRC: internationale code van deze opname (MusicBrainz)">${esc(t.isrc)}</abbr>`,
+    t.versions && `<abbr title="Google noemt alleen artiest + titel, niet de remix. Deze versies stonden op de resultatenpagina; kies zelf (pas de titel aan)">versies? ${esc(t.versions)}</abbr>`].filter(Boolean));
   return bits.length ? `<span class="album">${bits.join(' · ')}</span>` : '';
 }
 
@@ -544,7 +545,7 @@ function exportSet(s, kind) {
   } else {
     body = JSON.stringify({
       source: s.name, path: s.path, duration: s.duration, step: s.step || state.step, exported: new Date().toISOString(),
-      tracks: tracks.map((t, i) => ({ nr: i + 1, start: fmt(t.start_sec), end: fmt(t.end_sec), start_sec: t.start_sec, end_sec: t.end_sec, artist: t.artist, title: t.title, album: t.album, year: t.year, detections: t.hits, start_exact: t.exact, start_agree: t.agree || null, start_spread_sec: t.spread, method: t.method || null, bpm: t.bpm || null, key: t.key || null, isrc: t.isrc || null, mbid: t.mbid || null, label: t.label || null })),
+      tracks: tracks.map((t, i) => ({ nr: i + 1, start: fmt(t.start_sec), end: fmt(t.end_sec), start_sec: t.start_sec, end_sec: t.end_sec, artist: t.artist, title: t.title, album: t.album, year: t.year, detections: t.hits, start_exact: t.exact, start_agree: t.agree || null, start_spread_sec: t.spread, method: t.method || null, bpm: t.bpm || null, key: t.key || null, isrc: t.isrc || null, mbid: t.mbid || null, label: t.label || null, versions: t.versions || null })),
     }, null, 2);
     mime = 'application/json';
   }
