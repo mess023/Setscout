@@ -232,7 +232,7 @@ await test('referentie: 1001Tracklists parse + nette fout bij blokkade', async (
 await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor ID/vóór eerste cue; Van = cue', async () => {
   const page = ['01:00|A - Een', '03:00|ID - ID', '05:00|B - Twee'].map(r => { const [c, n] = r.split('|'); return `<div class="tlpItem"><meta itemprop="name" content="${n}"><div class="cueValueField">${c}</div></div>`; }).join('');
   let fetches = 0;
-  globalThis.fetch = async (url) => { fetches++; return { text: async () => url.includes('/search/') ? '<a href="/tracklist/x/set.html">x</a>' : page }; };
+  globalThis.fetch = async (url) => { fetches++; return { text: async () => url.includes('/search/') ? '<a href="/tracklist/x/andhim-awakenings-festival.html">x</a>' : page }; };
   const shazamAt = [];
   api.shazam = async () => { shazamAt.push(cur); return { artist: 'S', title: 'Shazam-vondst' }; };
   let cur;
@@ -241,7 +241,7 @@ await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor 
   const segs = [];
   for (const pos of [0, 60, 90, 180, 240, 300, 330]) {
     cur = pos;
-    segs.push({ pos, match: await p.recognize({ ...ctx(), pos, file: 'My Set.mp3' }) });
+    segs.push({ pos, match: await p.recognize({ ...ctx(), pos, file: 'Andhim Awakenings.mp3' }) });
     assert.equal(p.pause(), shazamAt.at(-1) === pos ? 3000 : 0, 'alleen pauze na een Shazam-call');
   }
   assert.deepEqual(shazamAt, [0, 180, 240], 'Shazam alleen vóór de eerste cue en in het ID-blok');
@@ -249,6 +249,59 @@ await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor 
   const r = toRanges(segs, 12, 30);
   assert.deepEqual(r.map(t => [t.title, t.method, t.start_sec, t.exact]),
     [['Shazam-vondst', 'Shazam', 0, false], ['Een', '1001Tracklists', 60, true], ['Shazam-vondst', 'Shazam', 180, false], ['Twee', '1001Tracklists', 300, true]]);
+});
+
+await test('tracklist-tekst: tijd voor/achter, nummering, labels, ID; volgorde-check', () => {
+  const t = M.parseTimedLines(`Tracklist:\n00:00 Aberton - Me Out\n2. [05:00] Jonny Calypso – Teenager 2K15 [Label]\nVictor Vera - Pressure (Daniel Sbert Remix) 08:00\n1:02:03 ID - ID\nmooie set!`);
+  assert.deepEqual(t.map(x => [x.start_sec, x.artist, x.title, x.unknown]), [
+    [0, 'Aberton', 'Me Out', false], [300, 'Jonny Calypso', 'Teenager 2K15', false],
+    [480, 'Victor Vera', 'Pressure (Daniel Sbert Remix)', false], [3723, 'ID', 'ID', true]]);
+  assert.deepEqual(M.parseTimedLines('41:30 was silly business'), [], 'losse comment met één tijd is geen tracklist');
+  assert.deepEqual(M.parseTimedLines('10:00 A - B\n02:00 C - D\n05:00 E - F\n01:00 G - H'), [], 'door elkaar = geen tracklist');
+});
+
+await test('YouTube: hoofdstukken > beste comment (meeste regels, vastgepind); ID uit bestandsnaam, anders zoeken', async () => {
+  const list = '00:00 A - Een\n03:00 B - Twee\n06:00 C - Drie';
+  assert.equal(M.bestYoutubeTracklist({ chapters: [], description: 'geen', comments: [{ text: '41:30 lol' }] }), null);
+  const best = M.bestYoutubeTracklist({ description: '', comments: [{ text: list, like_count: 3 }, { text: list + '\n09:00 D - Vier', is_pinned: true }] });
+  assert.equal(best.tracks.length, 4);
+  assert.equal(M.bestYoutubeTracklist({ chapters: [{ start_time: 0, title: 'X - Y' }, { start_time: 60, title: 'P - Q' }, { start_time: 120, title: 'R - S' }], comments: [{ text: list + '\n09:00 D - Vier' }] }).from, 'hoofdstukken');
+  const calls = [];
+  api.run = async (cmd, args) => { calls.push(args.at(-1)); return { code: 0, stdout: JSON.stringify({ title: 'Set', description: list, comments: [] }) + '\n', stderr: '' }; };
+  const m = byId.youtube, cfg = { ytdlp: 'package.json', maxComments: 50 };
+  const t = await m.tracklist('Andhim (Full Set) - Das Festival 2026 [AbCdEfGhIjK].webm', cfg);
+  assert.equal(calls[0], 'https://www.youtube.com/watch?v=AbCdEfGhIjK');
+  assert.deepEqual(t.map(x => x.start_sec), [0, 180, 360]);
+  await m.tracklist('Andhim - Das Festival 2026.mp3', cfg);
+  assert.equal(calls[1], 'ytsearch1:Andhim Das Festival 2026');
+  api.run = async () => ({ code: 0, stdout: JSON.stringify({ title: 'Kale set', comments: [{ text: 'NICE SET' }] }), stderr: '' });
+  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /geen tracklist met tijden gevonden bij "Kale set".*1 comments/);
+  api.run = async () => ({ code: 1, stdout: '', stderr: 'ERROR: Video unavailable' });
+  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /yt-dlp: ERROR: Video unavailable/);
+});
+
+await test('MixesDB: zoeken (rangschikken + jaar) → ruwe wikitekst → [mmm]-minuten, "?" onbekend', async () => {
+  const raw = '== Tracklist ==\n# [000] WhoMadeWho - There\'s A Way (andhim Remix) [Get Physical]\n# [006] andhim - Rollercoaster [Monaberry]\n# [023] ?\n# [1:02:03] X - Y\n# Zonder Tijd - Track\n[[Category:2015]]';
+  assert.deepEqual(M.parseMixesdb(raw).map(t => [t.start_sec, t.artist, t.title, t.unknown]), [
+    [0, 'WhoMadeWho', "There's A Way (andhim Remix)", false], [360, 'andhim', 'Rollercoaster', false], [1380, '', '?', true], [3723, 'X', 'Y', false]]);
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(url);
+    if (url.includes('list=search')) return jsonRes({ query: { search: [{ title: '2013-06-28 - andhim @ Fusion Festival, Germany' }, { title: '2015-06-28 - andhim @ Awakenings Festival, Amsterdam' }] } });
+    return { text: async () => raw };
+  };
+  const t = await byId.mixesdb.tracklist('andhim - Awakenings 2015.mp3', {});
+  assert.match(urls[0], /^https:\/\/www\.mixesdb\.com\/w\/api\.php\?.*srsearch=andhim%20Awakenings%202015/);
+  assert.match(urls[1], /title=2015-06-28_-_andhim_%40_Awakenings_Festival%2C_Amsterdam/, 'beste match met juist jaar');
+  assert.equal(t.length, 4);
+  await assert.rejects(byId.mixesdb.tracklist('andhim - Das Festival 2026.mp3', {}), /geen passende mix gevonden voor "andhim Das Festival 2026"/, 'zelfde DJ, ander jaar = geen match');
+});
+
+await test('rankByWords: DJ + jaar + ander woord nodig; generieke woorden tellen niet', () => {
+  const r = (q, items) => M.rankByWords(q, items)[0];
+  assert.equal(r('Andhim komm schon Alter Das Festival 2026', ['2016-08-13 - andhim @ DGTL Festival, Barcelona']).ok, false);
+  assert.equal(r('Andhim Das Festival 2026', ['/tracklist/a/andhim-das-festival-netherlands-2026-05-23.html']).ok, true);
+  assert.equal(r('Andhim Festival', ['x andhim @ Melt Festival']).ok, false, '"festival" alleen is te generiek');
 });
 
 await test('verrijking: MusicBrainz vult isrc/album aan, één keer per track (cache)', async () => {

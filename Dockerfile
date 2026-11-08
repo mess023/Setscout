@@ -13,8 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python tools in a venv (Debian blocks system-wide pip). Setscout finds python3 via PATH.
 RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir numpy scipy docopt joblib psutil essentia
+    && /opt/venv/bin/pip install --no-cache-dir numpy scipy docopt joblib psutil essentia "yt-dlp[default]"
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Deno: JavaScript runtime yt-dlp needs for YouTube (method "YouTube-tracklist"). Pinned + checksum-verified.
+ARG DENO_VERSION=2.9.8
+ARG DENO_SHA256=e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609
+RUN curl -fsSL -o /tmp/deno.zip https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip \
+    && echo "${DENO_SHA256}  /tmp/deno.zip" | sha256sum -c - \
+    && python3 -c "import zipfile; zipfile.ZipFile('/tmp/deno.zip').extract('deno', '/usr/local/bin')" \
+    && chmod +x /usr/local/bin/deno && rm /tmp/deno.zip
 
 # audfprint (dpwe, MIT) — the original Python version, see the report for why
 RUN mkdir -p /app/tools/audfprint \
