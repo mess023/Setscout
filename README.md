@@ -64,7 +64,7 @@ Exporteren gaat via Instellingen → Export → **Op de server**: de bestanden k
 
 | Env | Betekenis |
 |---|---|
-| `SETSCOUT_PASSWORD` | HTTP Basic-wachtwoord (gebruikersnaam maakt niet uit) |
+| `SETSCOUT_PASSWORD` | HTTP Basic-wachtwoord (gebruikersnaam maakt niet uit). Een `$` schrijf je in compose als `$$`; de log toont bij het starten de lengte ter controle |
 | `SETSCOUT_ROOTS` | mappen die de file browser mag tonen (standaard `/sets:/music:/exports`) |
 | `PORT`, `HOST` | luisteradres (standaard 3847, 0.0.0.0 in de image) |
 

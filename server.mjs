@@ -292,7 +292,9 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   const addr = `http://localhost:${PORT}`;
-  console.log(`Setscout draait op http://${HOST}:${PORT}${PASSWORD ? ' (met wachtwoord)' : ''}${ROOTS.length ? ' · mappen: ' + ROOTS.join(', ') : ''}`);
+  // length only (never the value): lets the user spot a password truncated by compose's `$` interpolation
+  console.log(`Setscout draait op http://${HOST}:${PORT}${PASSWORD ? ` (met wachtwoord, ${PASSWORD.length} tekens)` : ''}${ROOTS.length ? ' · mappen: ' + ROOTS.join(', ') : ''}`);
+  if (!PASSWORD && !['127.0.0.1', 'localhost', '::1'].includes(HOST)) console.warn('Let op: geen SETSCOUT_PASSWORD gezet — iedereen op het netwerk kan Setscout openen. (Een $ in docker compose schrijf je als $$.)');
   if (!hasCommand('ffmpeg') || !hasCommand('ffprobe')) console.warn('Let op: ffmpeg/ffprobe niet gevonden op PATH — scannen werkt niet.');
   if (!process.env.NO_OPEN) {
     const opener = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', addr]]
