@@ -330,7 +330,7 @@ await test('NAFP/PeakNetFP: HTTP-worker index + query (gemockt), drempel, tags; 
   // query via the pipeline (status() would need a live worker, so call localRecognize's path through recognize of a fake-ready chain)
   const hit = await byId.peaknetfp.local.queryFn(Buffer.from('RIFF'), { ...cfg });
   assert.equal(calls[1].url, 'http://w:8099/query?model=peaknetfp'); assert.equal(calls[1].ct, 'audio/wav');
-  assert.deepEqual(hit, { path: song, score: 0.8, offset: 42.5 });
+  assert.deepEqual(hit, { path: song, score: 0.8 }, 'PeakNetFP: offset (nog) niet gebruikt');
   globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ error: 'FileNotFoundError: checkpoint' }) });
   await assert.rejects(byId.nafp.local.queryFn(Buffer.from('x'), cfg), /NeuralFP \(NAFP\)-worker: FileNotFoundError: checkpoint/);
   assert.equal(byId.nafp.status({ ...cfg, url: 'http://127.0.0.1:1' }).state, 'tool', 'geen worker → niet bereikbaar');
