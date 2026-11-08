@@ -35,22 +35,19 @@ services:
       - /mnt/tank/music:/music:ro
 
   # --- Optional: Android emulator for the method 'Google "Zoek een nummer"' (experimental) ---
-  # Starts only with:  docker compose --profile google up -d   (TrueNAS: delete the `profiles:` line to enable)
-  # Needs hardware virtualisation: /dev/kvm on the host (TrueNAS bare metal; in a VM: nested virtualisation).
-  # Not built by CI (many GB). Build it on the NAS first, see docker/android/README.md; log in once with scrcpy.
-  android:
-    profiles: ["google"]
-    build: ./docker/android
-    image: setscout-android:latest
-    container_name: android
-    restart: unless-stopped
-    devices:
-      - /dev/kvm:/dev/kvm
-    environment:
-      MEMORY: "4096"
-      CORES: "2"
-    volumes:
-      - /mnt/tank/apps/setscout-android:/data    # AVD incl. Google login survives restarts
-    ports:
-      - "5555:5555"   # ADB, for the scrcpy login from your PC; Setscout itself uses android:5555 inside compose
-    # 4713 (PulseAudio) stays internal: only Setscout needs it
+  # Not built by CI and not buildable by TrueNAS from this YAML: build setscout-android:latest once in the
+  # TrueNAS shell (docker/android/README.md, steps 1–3), then uncomment this block. Needs /dev/kvm.
+  # android:
+  #   image: setscout-android:latest
+  #   pull_policy: never                         # local image, built in the shell
+  #   container_name: android
+  #   restart: unless-stopped
+  #   devices:
+  #     - /dev/kvm:/dev/kvm
+  #   environment:
+  #     MEMORY: "4096"
+  #     CORES: "2"
+  #   volumes:
+  #     - /mnt/tank/apps/setscout-android:/data  # AVD incl. Google login survives restarts
+  #   ports:
+  #     - "5555:5555"   # ADB, for the scrcpy login from your PC; Setscout itself uses android:5555 inside the app
