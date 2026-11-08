@@ -19,6 +19,21 @@ services:
       - /mnt/tank/djsets:/sets:ro                # the mixes to scan (read-only)
       - /mnt/tank/djsets/tracklists:/exports     # "save on server" exports (read-write)
 
+  # --- Optional: neural fingerprinting (methods "NeuralFP (NAFP)" and "PeakNetFP") ---
+  # Separate image (TensorFlow CPU, ~2–3 GB). Same /data and /music paths as setscout, so file paths match.
+  # No ports: Setscout reaches it inside the app at http://setscout-nafp:8099. Code: CC BY-NC-SA 4.0 (non-commercial).
+  setscout-nafp:
+    image: ghcr.io/mess023/setscout-nafp:latest
+    container_name: setscout-nafp
+    restart: unless-stopped
+    user: "568:568"
+    environment:
+      NAFP_DATA: /data/nafp                      # index per model (embeddings + files.json)
+      NAFP_THREADS: "4"                          # CPU threads for TensorFlow (0 = all)
+    volumes:
+      - /mnt/tank/apps/setscout:/data
+      - /mnt/tank/music:/music:ro
+
   # --- Optional: Android emulator for the method 'Google "Zoek een nummer"' (experimental) ---
   # Starts only with:  docker compose --profile google up -d   (TrueNAS: delete the `profiles:` line to enable)
   # Needs hardware virtualisation: /dev/kvm on the host (TrueNAS bare metal; in a VM: nested virtualisation).

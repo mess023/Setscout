@@ -643,6 +643,7 @@ function renderSettings() {
   let html = '';
   for (const [g, title, tip] of GROUPS) {
     const list = cfg.methods.filter(m => g === 'chain' ? inChain(m) : m.group === g);
+    if (!list.length) continue; // e.g. nothing left under "Niet mogelijk"
     let pos = 0;
     html += `<h2><abbr title="${esc(tip)}">${title}</abbr>${g === 'chain' ? `<small>${chain().length} actief</small>` : ''}</h2>
       <div class="mlist" data-group="${g}">${list.map(m => cardHtml(m, m.values.enabled ? ++pos : 0)).join('')}</div>`;

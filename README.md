@@ -5,7 +5,7 @@ Lokale web-app die de track-ID's uit DJ-sets haalt. Setscout knipt de mix in fra
 | Groep | Methodes |
 |---|---|
 | Cloud | Shazam, Shazam gepitcht (fragment ±% terugpitchen), AudD, AudioTag.info, AcoustID |
-| Eigen collectie (index van je muziekmappen) | audfprint, Olaf, Panako, Dejavu |
+| Eigen collectie (index van je muziekmappen) | audfprint, Olaf, Panako, Dejavu, NeuralFP (NAFP) en PeakNetFP (neuraal, aparte container `setscout-nafp`) |
 | Referentie-tracklists (vullen gaten) | trackid.dev (YouTube-ID in de bestandsnaam), 1001Tracklists (best effort) |
 | Verrijking | MusicBrainz (album/jaar/ISRC), Essentia (BPM/key) |
 | Experimenteel | Google "Zoek een nummer" via een Android-emulator (zie `docker/android/README.md`) |
@@ -70,6 +70,8 @@ Exporteren gaat via Instellingen → Export → **Op de server**: de bestanden k
 
 Buiten je LAN alleen achter een reverse proxy met HTTPS.
 
+**Optioneel: neurale fingerprinting** (NeuralFP/PeakNetFP). Voeg de service `setscout-nafp` uit `docker-compose.yml` toe (zelfde `/data`- en `/music`-paden als setscout, geen poort nodig). Daarna in Setscout: Instellingen → *NeuralFP (NAFP)* en/of *PeakNetFP* aanzetten → Collectie → **Index bijwerken**. Draait op CPU; indexeren kost enkele seconden per track.
+
 **Optioneel: de Android-emulator** voor Google "Zoek een nummer". Die heeft `/dev/kvm` nodig en zit niet in CI. Bouwen en inloggen: zie [`docker/android/README.md`](docker/android/README.md).
 
 ## Bronvermelding en licenties
@@ -87,6 +89,9 @@ Gebruikte software; die zit **niet** in deze repo, maar wordt in de Docker-image
 | Olaf | AGPL-3.0 | https://github.com/JorenSix/Olaf |
 | Panako | AGPL-3.0 | https://github.com/JorenSix/Panako |
 | Essentia | AGPL-3.0 | https://github.com/MTG/essentia |
+| PeakNetFP / NeuralFP-code (worker-image) | CC BY-NC-SA 4.0 (niet-commercieel) | https://github.com/guillemcortes/peaknetfp |
+| PeakNetFP/NeuralFP-checkpoints | MIT | https://doi.org/10.5281/zenodo.15782389 |
+| TensorFlow / FAISS (worker-image) | Apache-2.0 / MIT | https://www.tensorflow.org · https://github.com/facebookresearch/faiss |
 | Chromaprint / fpcalc | LGPL-2.1 | https://github.com/acoustid/chromaprint |
 | ffmpeg | LGPL/GPL | https://ffmpeg.org |
 | docker-android (optioneel) | MIT | https://github.com/HQarroum/docker-android |

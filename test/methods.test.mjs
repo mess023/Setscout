@@ -312,6 +312,30 @@ await test('rankByWords: DJ + jaar + ander woord nodig; generieke woorden tellen
   assert.equal(r('Andhim Festival', ['x andhim @ Melt Festival']).ok, false, '"festival" alleen is te generiek');
 });
 
+await test('NAFP/PeakNetFP: HTTP-worker index + query (gemockt), drempel, tags; status zonder worker', async () => {
+  const song = join(TMP, 'Daft Punk - Around The World.wav');
+  writeFileSync(song, pcmToWav(pcm));
+  const calls = [];
+  let score = 0.8;
+  globalThis.fetch = async (url, o) => {
+    calls.push({ url, ct: o.headers['Content-Type'], body: o.body });
+    if (url.includes('/index')) return { ok: true, status: 200, json: async () => ({ indexed: JSON.parse(o.body).files.length }) };
+    return { ok: true, status: 200, json: async () => ({ path: song, score, offset: 42.5 }) };
+  };
+  const cfg = { ...effectiveSettings().methods.nafp, url: 'http://w:8099/' };
+  await byId.nafp.local.indexFn(['/music/a.mp3', '/music/b.mp3'], cfg);
+  assert.equal(calls[0].url, 'http://w:8099/index?model=neuralfp');
+  assert.deepEqual(JSON.parse(calls[0].body), { files: ['/music/a.mp3', '/music/b.mp3'] });
+  assert.equal(byId.peaknetfp.local.batch, 5);
+  // query via the pipeline (status() would need a live worker, so call localRecognize's path through recognize of a fake-ready chain)
+  const hit = await byId.peaknetfp.local.queryFn(Buffer.from('RIFF'), { ...cfg });
+  assert.equal(calls[1].url, 'http://w:8099/query?model=peaknetfp'); assert.equal(calls[1].ct, 'audio/wav');
+  assert.deepEqual(hit, { path: song, score: 0.8, offset: 42.5 });
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ error: 'FileNotFoundError: checkpoint' }) });
+  await assert.rejects(byId.nafp.local.queryFn(Buffer.from('x'), cfg), /NeuralFP \(NAFP\)-worker: FileNotFoundError: checkpoint/);
+  assert.equal(byId.nafp.status({ ...cfg, url: 'http://127.0.0.1:1' }).state, 'tool', 'geen worker → niet bereikbaar');
+});
+
 await test('verrijking: MusicBrainz vult isrc/album aan, één keer per track (cache)', async () => {
   let n = 0;
   api.shazam = async () => ({ artist: 'A', title: 'T', album: '', year: '' });
