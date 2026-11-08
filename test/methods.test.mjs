@@ -205,11 +205,24 @@ await test('referentie: 1001Tracklists parse + nette fout bij blokkade', async (
   const page = `<div class="tlpItem x"><meta itemprop="name" content="Artist One - Song &amp; Co"><div class="cueValueField">01:02:03</div></div>
     <div class="tlpItem"><meta itemprop="name" content="Two - B"><div class="cueValueField"> 05:00</div></div>
     <div class="tlpItem"><meta itemprop="name" content="ID - ID"><div class="cueValueField">08:00</div></div>`;
-  globalThis.fetch = async (url) => ({ text: async () => url.includes('/search/') ? '<a href="/tracklist/abc/set.html">x</a>' : page });
-  const list = await byId['1001tl'].tracklist('My Set [AbCdEfGhIjK].webm', {});
+  const calls = [];
+  globalThis.fetch = async (url, o = {}) => {
+    calls.push({ url, method: o.method || 'GET', body: o.body?.toString(), cookie: o.headers?.Cookie, referer: o.headers?.Referer });
+    if (url.endsWith('.com/')) return { headers: { getSetCookie: () => ['guid=abc; Path=/; HttpOnly', 'uid=1; Path=/'] }, text: async () => '' };
+    return { text: async () => url.includes('/search/') ? '<a href="/tracklist/abc/set.html">x</a>' : page };
+  };
+  const list = await byId['1001tl'].tracklist('Andhim (Full Set) - komm schon Alter, Das Festival 2026 [AbCdEfGhIjK].webm', {});
   assert.deepEqual(list, [{ start_sec: 3723, artist: 'Artist One', title: 'Song & Co', unknown: false }, { start_sec: 300, artist: 'Two', title: 'B', unknown: false }, { start_sec: 480, artist: 'ID', title: 'ID', unknown: true }]);
+  // zoeken zoals het formulier van de site: POST met cookies van de homepage, zoekterm opgeschoond
+  assert.equal(calls[1].method, 'POST');
+  assert.equal(calls[1].body, 'main_search=Andhim+komm+schon+Alter+Das+Festival+2026&search_selection=9');
+  assert.equal(calls[1].cookie, 'guid=abc; uid=1');
+  assert.equal(calls[2].url, 'https://www.1001tracklists.com/tracklist/abc/set.html');
+  assert.equal(calls[2].referer, 'https://www.1001tracklists.com/search/result.php');
   globalThis.fetch = async () => ({ text: async () => 'Please wait, you will be forwarded' });
   await assert.rejects(byId['1001tl'].tracklist('x.mp3', {}), /geblokkeerd/);
+  globalThis.fetch = async () => ({ text: async () => '<html>no results</html>' });
+  await assert.rejects(byId['1001tl'].tracklist('x.mp3', { query: 'Andhim Das Festival' }), /geen tracklist gevonden voor "Andhim Das Festival"/);
 });
 
 await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor ID/vóór eerste cue; Van = cue', async () => {
@@ -228,7 +241,7 @@ await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor 
     assert.equal(p.pause(), shazamAt.at(-1) === pos ? 3000 : 0, 'alleen pauze na een Shazam-call');
   }
   assert.deepEqual(shazamAt, [0, 180, 240], 'Shazam alleen vóór de eerste cue en in het ID-blok');
-  assert.equal(fetches, 2, 'tracklist één keer opgehaald');
+  assert.equal(fetches, 3, 'tracklist één keer opgehaald (home + zoeken + pagina)');
   const r = toRanges(segs, 12, 30);
   assert.deepEqual(r.map(t => [t.title, t.method, t.start_sec, t.exact]),
     [['Shazam-vondst', 'Shazam', 0, false], ['Een', '1001Tracklists', 60, true], ['Shazam-vondst', 'Shazam', 180, false], ['Twee', '1001Tracklists', 300, true]]);
