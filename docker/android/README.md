@@ -35,7 +35,9 @@ TrueNAS bewaart en start de compose-YAML zelf. Daarom werkt `docker compose --pr
 4. **TrueNAS-UI: YAML.** Bij de service `android`: **geen** `profiles:` en **geen** `build:`, wel `image: setscout-android:latest` + `pull_policy: never`. Bij `setscout`: `ADB_VENDOR_KEYS: /data/adbkey`. Save, en wacht 1–3 minuten tot de emulator is opgestart (Logs van de container `android`).
 5. **Eenmalig inloggen (dat doe je zelf):**
    1. Op je pc: de emulator accepteert alleen dezelfde repo-sleutel, dus ook je pc-adb moet die gebruiken. Kopieer `adbkey` naar je pc (bijv. naar de scrcpy-map) en voer in die map uit:
-      `set ADB_VENDOR_KEYS=%CD%\adbkey` → `adb kill-server` → `adb connect <nas-ip>:5555` → `scrcpy -s <nas-ip>:5555`.
+      `set ADB_VENDOR_KEYS=%CD%\adbkey` → `adb kill-server` → `adb connect <nas-ip>:5555` →
+      `scrcpy -s <nas-ip>:5555 --no-audio --video-codec=h264 --video-encoder=c2.android.avc.encoder --max-size=1024 --max-fps=30`
+      (zonder geluidsopname en met de software-encoder: met de standaardinstellingen crashte de emulator na een paar minuten scrcpy).
    2. In het emulatorscherm: **Instellingen → Wachtwoorden en accounts → Account toevoegen → Google**. Log in met het aparte account.
    3. Open de **Google-app** en tik op het **microfoontje → Zoek een nummer**. Geef toestemming voor de microfoon.
    4. Sluit scrcpy. De login blijft bewaard in het volume van de `android`-service.
@@ -53,4 +55,7 @@ TrueNAS bewaart en start de compose-YAML zelf. Daarom werkt `docker compose --pr
 | `Could not init 'pa' audio driver` | De virtuele microfoon werkt dan niet. Het startscript start de emulator daarom in venstermodus op een virtueel scherm (Xvfb), want alleen die variant heeft PulseAudio. Komt de regel toch terug: controleer dat `EMULATOR_WINDOW` **niet** op `none` staat |
 | `cannot get x11 display info` + `Segmentation fault` kort na de start | Er was geen (virtueel) scherm. Opgelost met Xvfb; opnieuw bouwen (stap 2) |
 | `Running multiple emulators with the same AVD` | Oude lock-bestanden na een crash. Het startscript ruimt die nu op; opnieuw bouwen (stap 2) |
+| `Segmentation fault` minuten na `ANDROID_READY`, terwijl scrcpy verbonden is | Gebruik scrcpy met `--no-audio` en de software-encoder (zie stap 5). Blijft hij crashen, ook zonder scrcpy: zet bij `android` `EMULATOR_GPU: guest` |
+| `Emulator does not support more than 6 cores` | Alleen een waarschuwing; zet `CORES` op 4 |
+| `socat … tcp:127.0.0.1:5555: Connection refused` vlak na de start | Normaal: de ADB-doorgifte is er voordat de emulator luistert |
 | Emulator start niet meer na de update | Zet bij `android` tijdelijk `EMULATOR_WINDOW: none` (headless, **zonder microfoon**) en stuur de log |

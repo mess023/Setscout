@@ -34,6 +34,15 @@ if [ "${EMULATOR_WINDOW:-xvfb}" = xvfb ]; then
   START=/tmp/start-emulator.sh
 fi
 
+# 2b. Optional GPU mode override (base default: swiftshader_indirect = host-side software GPU via gfxstream).
+#     EMULATOR_GPU=guest renders entirely inside Android (slower, avoids the host GPU layer) if the emulator
+#     keeps segfaulting.
+if [ -n "${EMULATOR_GPU:-}" ]; then
+  [ "$START" = /opt/start-emulator.sh ] && cp /opt/start-emulator.sh /tmp/start-emulator.sh && START=/tmp/start-emulator.sh
+  sed -i "s/-gpu \"\$GPU_MODE\"/-gpu \"$EMULATOR_GPU\"/" "$START" && chmod +x "$START"
+  echo "setscout: GPU-modus $EMULATOR_GPU" >&2
+fi
+
 # 3. Host audio as microphone; guest Vulkan off — the software GPU (SwiftShader) crashed the emulator
 #    with a segfault when Play Store/Chromium used Vulkan.
 export EXTRA_FLAGS="-allow-host-audio -feature -Vulkan ${EXTRA_FLAGS:-}"
