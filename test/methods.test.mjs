@@ -83,7 +83,7 @@ await test('methode zonder sleutel doet niet mee', () => {
 await test('Shazam gepitcht: ffmpeg pitcht echt, volgorde −2,+2,−4; label', async () => {
   const lens = [];
   api.shazam = async (buf) => { lens.push(buf.length); return lens.length === 3 ? { artist: 'P', title: 'Q' } : null; };
-  const p = createPipeline(settings({ shazam: { enabled: false }, 'shazam-pitch': { enabled: true, percents: '2,4' } }));
+  const p = createPipeline(settings({ shazam: { enabled: false }, 'shazam-pitch': { enabled: true, percents: '2,4', mode: 'vinyl' } }));
   const r = await p.recognize(ctx());
   assert.equal(r.method, 'Shazam −4%'); assert.equal(r.pitch, -4);
   // vinyl −2 %: slower → longer than the 64000-byte input; +2 %: shorter
@@ -96,6 +96,18 @@ await test('Shazam gepitcht keylock gebruikt atempo (andere lengte, zelfde richt
   const p = createPipeline(settings({ shazam: { enabled: false }, 'shazam-pitch': { enabled: true, percents: '6', mode: 'keylock' } }));
   assert.equal(await p.recognize(ctx()), null);
   assert.equal(lens.length, 2); assert.ok(lens[0] > lens[1]);
+});
+
+await test('Shazam gepitcht modus beide (standaard): per stap eerst vinyl dan keylock; label met modus', async () => {
+  assert.equal(effectiveSettings().methods['shazam-pitch'].mode, 'both');
+  const lens = [];
+  api.shazam = async (buf) => { lens.push(buf.length); return lens.length === 4 ? { artist: 'K', title: 'L' } : null; };
+  const p = createPipeline(settings({ shazam: { enabled: false }, 'shazam-pitch': { enabled: true, percents: '2' } }));
+  const r = await p.recognize(ctx());
+  // volgorde: −2 vinyl, −2 keylock, +2 vinyl, +2 keylock (raak)
+  assert.equal(lens.length, 4);
+  assert.equal(r.method, 'Shazam +2% keylock'); assert.equal(r.pitch, 2); assert.equal(r.stretch, 1.02);
+  assert.ok(lens[0] > pcm.length && lens[1] > pcm.length && lens[2] < pcm.length && lens[3] < pcm.length, `lengtes ${lens}`);
 });
 
 await test('AudioTag: upload → wait → poll → found (array-vorm)', async () => {
