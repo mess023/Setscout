@@ -398,6 +398,42 @@ await test('versie uit andere methode: Google "Broken Glass" + Shazam "Broken Gl
   assert.equal(toRanges([{ pos: 0, match: G }, { pos: 30, match: { ...S, title: 'Body Language (Remix)' } }], 12, 30).length, 2);
 });
 
+await test('tweede mening: Google-hit met versies → AudD (na Google in de keten) beslist de remix', async () => {
+  const gStatus = byId.google.status; byId.google.status = () => ({ state: 'ok', msg: 'test' }); // no emulator here
+  try {
+    const page = srp('Booka Shade Broken Glass', '<node text="" content-desc="Booka Shade - Topic"/><node text="Booka Shade - Broken Glass (Helsloot Remix)"/><node text="Broken Glass (Helsloot Extended Remix)"/>');
+    const listening = '<hierarchy><node text="Listening…" resource-id="x"/></hierarchy>';
+    let d = 0;
+    api.shazam = async () => null;
+    api.run = async (cmd, args) => ({ code: 0, stdout: args.includes('uiautomator') ? (d++ % 2 ? page : listening) : '', stderr: '' });
+    let auddCalls = 0, auddSays = { artist: 'Booka Shade', title: 'Broken Glass (Helsloot Remix)', album: 'Broken Glass' };
+    globalThis.fetch = async () => { auddCalls++; return jsonRes({ status: 'success', result: auddSays }); };
+    const methods = (google = {}) => ({ shazam: { enabled: true }, google: { enabled: true, adb: 'package.json', paplay: 'package.json', ...google }, audd: { enabled: true, apiKey: 'K' } });
+    // chain: Shazam (nothing) → Google (base title + versions) → AudD asked as second opinion
+    let p = createPipeline(settings(methods(), ['shazam', 'google', 'audd']));
+    let r = await p.recognize(ctx());
+    assert.deepEqual([r.artist, r.title, r.method, r.versions], ['Booka Shade', 'Broken Glass (Helsloot Remix)', 'AudD + Google', undefined]);
+    assert.equal(auddCalls, 1);
+    // AudD says the original → that decides too (no remix), hint gone
+    auddSays = { artist: 'Booka Shade', title: 'Broken Glass' };
+    r = await createPipeline(settings(methods(), ['shazam', 'google', 'audd'])).recognize(ctx());
+    assert.deepEqual([r.title, r.method, r.versions], ['Broken Glass', 'AudD + Google', undefined]);
+    // AudD hears another song → keep Google's result and hint
+    auddSays = { artist: 'Someone', title: 'Else (Remix)' };
+    r = await createPipeline(settings(methods(), ['shazam', 'google', 'audd'])).recognize(ctx());
+    assert.deepEqual([r.title, r.method, Boolean(r.versions)], ['Broken Glass', 'Google', true]);
+    // switched off, or AudD not selected → AudD not asked
+    auddCalls = 0;
+    await createPipeline(settings(methods({ second: 'off' }), ['shazam', 'google', 'audd'])).recognize(ctx());
+    await createPipeline(settings(methods({ secondAudd: 'off' }), ['shazam', 'google', 'audd'])).recognize(ctx());
+    assert.equal(auddCalls, 0);
+    // AudD before Google already tried this fragment (and found nothing) → not asked twice
+    globalThis.fetch = async () => { auddCalls++; return jsonRes({ status: 'success', result: null }); };
+    r = await createPipeline(settings(methods(), ['audd', 'shazam', 'google'])).recognize(ctx());
+    assert.equal(auddCalls, 1); assert.equal(r.method, 'Google');
+  } finally { byId.google.status = gStatus; }
+});
+
 await test('Google: versies op de resultatenpagina als hint (niet automatisch gekozen)', async () => {
   const cfg = effectiveSettings().methods.google;
   const page = srp('Booka Shade Broken Glass',
