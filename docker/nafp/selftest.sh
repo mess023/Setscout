@@ -13,7 +13,14 @@ ffmpeg -v error -f lavfi -i "aevalsrc=$(tones 12.9898):d=40" -f lavfi -i "anoise
 ffmpeg -v error -f lavfi -i "aevalsrc=$(tones 78.233):d=40" -f lavfi -i "anoisesrc=d=40:c=pink:seed=11:a=0.05" -filter_complex amix=inputs=2 -ar 44100 b.wav
 ffmpeg -v error -ss 15 -t 10 -i b.wav -ar 16000 -ac 1 q.wav
 for m in neuralfp peaknetfp; do
-  NAFP_DATA=/tmp/nafp python /app/nafp_worker.py index $m /tmp/a.wav /tmp/b.wav
+  # a broken file in the middle of the batch: only that one may fail, the others must be indexed
+  echo "not audio" > /tmp/broken.mp3
+  NAFP_DATA=/tmp/nafp python /app/nafp_worker.py index $m /tmp/a.wav /tmp/broken.mp3 /tmp/b.wav > /tmp/i.json
+  python - "$m" <<'PY'
+import json, sys
+r = json.load(open("/tmp/i.json"))
+assert r["indexed"] == 2 and [f["file"] for f in r["failed"]] == ["/tmp/broken.mp3"], (sys.argv[1], r)
+PY
   NAFP_DATA=/tmp/nafp python /app/nafp_worker.py query $m /tmp/q.wav > /tmp/r.json
   python - "$m" <<'PY'
 import json, sys
@@ -24,4 +31,4 @@ if m == "neuralfp":
 print(m, "ok", r)
 PY
 done
-rm -rf /tmp/nafp /tmp/*.wav /tmp/r.json
+rm -rf /tmp/nafp /tmp/*.wav /tmp/broken.mp3 /tmp/r.json /tmp/i.json

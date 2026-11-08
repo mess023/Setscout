@@ -95,16 +95,24 @@ def store(name):
 
 
 def index(name, paths):
+    """Each file on its own: one unreadable file must not cost the rest of the batch."""
     d, f, files = store(name)
     embed = embedder(name)
+    done, failed = 0, []
     for p in paths:
-        e = embed(frames(decode(p)))
-        npy = hashlib.sha1(p.encode()).hexdigest() + ".npy"
-        np.save(os.path.join(d, npy), e)
-        files[p] = {"npy": npy, "n": int(len(e))}
-        json.dump(files, open(f, "w"))
+        try:
+            e = embed(frames(decode(p)))
+            npy = hashlib.sha1(p.encode()).hexdigest() + ".npy"
+            np.save(os.path.join(d, npy), e)
+            files[p] = {"npy": npy, "n": int(len(e))}
+            json.dump(files, open(f, "w"))
+            done += 1
+        except subprocess.CalledProcessError as ex:
+            failed.append({"file": p, "error": "ffmpeg: " + ex.stderr.decode(errors="replace").strip()[-200:]})
+        except Exception as ex:
+            failed.append({"file": p, "error": f"{type(ex).__name__}: {ex}"[:300]})
     _search.pop(name, None)  # rebuild the search index on the next query
-    return {"indexed": len(paths)}
+    return {"indexed": done, "failed": failed}
 
 
 def searcher(name):

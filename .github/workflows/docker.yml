@@ -1,5 +1,5 @@
 # Build the Setscout images and push them to GitHub Container Registry:
-#   ghcr.io/<owner>/setscout       — the app (+ ffmpeg, audfprint, Olaf, Panako, Dejavu, Essentia, yt-dlp)
+#   ghcr.io/<owner>/setscout       — the app (+ ffmpeg, audfprint, Olaf, Panako, Dejavu, Essentia)
 #   ghcr.io/<owner>/setscout-nafp  — optional neural-fingerprint worker (NeuralFP / PeakNetFP, TensorFlow CPU)
 # Both Dockerfiles run a functional test during the build. The Android-emulator image (docker/android) is NOT
 # built here: many GB and only useful with KVM.

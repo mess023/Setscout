@@ -191,6 +191,36 @@ await test('Olaf index bouwen: batches, threads, files.json, alleen nieuwe besta
   assert.equal(r2.summary[0].added, 0);
 });
 
+await test('index: één fout bestand kost alleen zichzelf (worker per bestand, CLI per bestand opnieuw), log max. 3 fouten, geen dubbele bestanden', async () => {
+  const music = join(TMP, 'music2'); mkdirSync(join(music, 'sub'), { recursive: true });
+  const names = ['a.mp3', 'b.mp3', 'bad.mp3', 'c.mp3', 'sub/d.mp3', 'sub/bad2.mp3', 'sub/bad3.mp3', 'sub/bad4.mp3'];
+  for (const n of names) writeFileSync(join(music, n), 'x');
+  const isBad = (f) => /bad\d?\.mp3$/.test(f);
+  // HTTP worker (NeuralFP): it reports failed files per batch
+  globalThis.fetch = async (url, o) => {
+    const files = JSON.parse(o.body).files;
+    return { ok: true, status: 200, json: async () => ({ indexed: files.filter(f => !isBad(f)).length, failed: files.filter(isBad).map(file => ({ file, error: 'RuntimeError: cannot cache function' })) }) };
+  };
+  const ev = [];
+  const s1 = effectiveSettings({ methods: { nafp: { enabled: true, url: 'http://w:1' }, olaf: { enabled: false } }, collection: { roots: [music, join(music, 'sub')] } });
+  const st = byId.nafp.status; byId.nafp.status = () => ({ state: 'ok' });
+  try {
+    const r = await M.buildIndex({ s: s1, onProgress: (p) => ev.push(p) });
+    assert.equal(r.files, 8, 'overlappende mappen: elk bestand één keer');
+    assert.deepEqual(r.summary, [{ method: 'NeuralFP (NAFP)', added: 4, errors: 4, total: 4 }]);
+    const errs = ev.filter(e => e.error);
+    assert.equal(errs.length, 4, '3 fouten voluit + 1 samenvattingsregel');
+    assert.match(errs[3].error, /nog 1 bestanden met een fout/);
+  } finally { byId.nafp.status = st; }
+  // CLI tool (Olaf): a failing batch is retried file by file
+  const runs = [];
+  api.run = async (cmd, args) => { const files = args.slice(3); runs.push(files.length); return files.some(isBad) ? { code: 1, stdout: '', stderr: 'decode error' } : { code: 0, stdout: '', stderr: '' }; };
+  const s2 = effectiveSettings({ methods: { olaf: { enabled: true, cmd: 'package.json' } }, collection: { roots: [music] } });
+  const r2 = await M.buildIndex({ s: s2 });
+  assert.deepEqual(r2.summary.map(({ method, added, errors }) => ({ method, added, errors })), [{ method: 'Olaf', added: 4, errors: 4 }]);
+  assert.deepEqual(runs, [8, 1, 1, 1, 1, 1, 1, 1, 1], 'eerst de hele batch, daarna per bestand');
+});
+
 await test('referentie: trackid.dev vult alleen gaten, op tijdstip', async () => {
   const urls = [];
   globalThis.fetch = async (url, o) => {
@@ -259,35 +289,6 @@ await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor 
     [['Shazam-vondst', 'Shazam', 0, false], ['Een', '1001Tracklists', 60, true], ['Shazam-vondst', 'Shazam', 180, false], ['Twee', '1001Tracklists', 300, true]]);
 });
 
-await test('tracklist-tekst: tijd voor/achter, nummering, labels, ID; volgorde-check', () => {
-  const t = M.parseTimedLines(`Tracklist:\n00:00 Aberton - Me Out\n2. [05:00] Jonny Calypso – Teenager 2K15 [Label]\nVictor Vera - Pressure (Daniel Sbert Remix) 08:00\n1:02:03 ID - ID\nmooie set!`);
-  assert.deepEqual(t.map(x => [x.start_sec, x.artist, x.title, x.unknown]), [
-    [0, 'Aberton', 'Me Out', false], [300, 'Jonny Calypso', 'Teenager 2K15', false],
-    [480, 'Victor Vera', 'Pressure (Daniel Sbert Remix)', false], [3723, 'ID', 'ID', true]]);
-  assert.deepEqual(M.parseTimedLines('41:30 was silly business'), [], 'losse comment met één tijd is geen tracklist');
-  assert.deepEqual(M.parseTimedLines('10:00 A - B\n02:00 C - D\n05:00 E - F\n01:00 G - H'), [], 'door elkaar = geen tracklist');
-});
-
-await test('YouTube: hoofdstukken > beste comment (meeste regels, vastgepind); ID uit bestandsnaam, anders zoeken', async () => {
-  const list = '00:00 A - Een\n03:00 B - Twee\n06:00 C - Drie';
-  assert.equal(M.bestYoutubeTracklist({ chapters: [], description: 'geen', comments: [{ text: '41:30 lol' }] }), null);
-  const best = M.bestYoutubeTracklist({ description: '', comments: [{ text: list, like_count: 3 }, { text: list + '\n09:00 D - Vier', is_pinned: true }] });
-  assert.equal(best.tracks.length, 4);
-  assert.equal(M.bestYoutubeTracklist({ chapters: [{ start_time: 0, title: 'X - Y' }, { start_time: 60, title: 'P - Q' }, { start_time: 120, title: 'R - S' }], comments: [{ text: list + '\n09:00 D - Vier' }] }).from, 'hoofdstukken');
-  const calls = [];
-  api.run = async (cmd, args) => { calls.push(args.at(-1)); return { code: 0, stdout: JSON.stringify({ title: 'Set', description: list, comments: [] }) + '\n', stderr: '' }; };
-  const m = byId.youtube, cfg = { ytdlp: 'package.json', maxComments: 50 };
-  const t = await m.tracklist('Andhim (Full Set) - Das Festival 2026 [AbCdEfGhIjK].webm', cfg);
-  assert.equal(calls[0], 'https://www.youtube.com/watch?v=AbCdEfGhIjK');
-  assert.deepEqual(t.map(x => x.start_sec), [0, 180, 360]);
-  await m.tracklist('Andhim - Das Festival 2026.mp3', cfg);
-  assert.equal(calls[1], 'ytsearch1:Andhim Das Festival 2026');
-  api.run = async () => ({ code: 0, stdout: JSON.stringify({ title: 'Kale set', comments: [{ text: 'NICE SET' }] }), stderr: '' });
-  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /geen tracklist gevonden bij "Kale set": .*1 comments gelezen/);
-  api.run = async () => ({ code: 1, stdout: '', stderr: 'ERROR: Video unavailable' });
-  await assert.rejects(m.tracklist('x [AbCdEfGhIjK].webm', cfg), /yt-dlp: ERROR: Video unavailable/);
-});
-
 await test('MixesDB: zoeken (rangschikken + jaar) → ruwe wikitekst → [mmm]-minuten, "?" onbekend', async () => {
   const raw = '== Tracklist ==\n# [000] WhoMadeWho - There\'s A Way (andhim Remix) [Get Physical]\n# [006] andhim - Rollercoaster [Monaberry]\n# [023] ?\n# [1:02:03] X - Y\n# Zonder Tijd - Track\n[[Category:2015]]';
   assert.deepEqual(M.parseMixesdb(raw).map(t => [t.start_sec, t.artist, t.title, t.unknown]), [
@@ -336,85 +337,21 @@ await test('NAFP/PeakNetFP: HTTP-worker index + query (gemockt), drempel, tags; 
   assert.equal(byId.nafp.status({ ...cfg, url: 'http://127.0.0.1:1' }).state, 'tool', 'geen worker → niet bereikbaar');
 });
 
-await test('tracklist zonder tijden: herkend (nummering, labels), lager dan een lijst met tijden', () => {
-  const comment = 'Tracklist:\n1. Victor Vera - Pressure (Daniel Sbert Remix)\n2. CS - What We Had [Label]\n3) Deco - New Day\n- Mini Elefant – Volador\nID - ID\nwat een set!';
-  assert.deepEqual(M.parseUntimedLines(comment).map(t => [t.artist, t.title, t.unknown]), [
-    ['Victor Vera', 'Pressure (Daniel Sbert Remix)', false], ['CS', 'What We Had', false], ['Deco', 'New Day', false], ['Mini Elefant', 'Volador', false], ['ID', 'ID', true]]);
-  assert.deepEqual(M.parseUntimedLines('A - B\nC - D\nleuk'), [], 'minder dan 4 regels: geen tracklist');
-  const untimed = M.bestYoutubeTracklist({ description: '', comments: [{ text: 'nice' }, { text: comment, like_count: 50 }] });
-  assert.equal(untimed.from, 'comment (zonder tijden)'); assert.equal(untimed.tracks.length, 5);
-  const timed = M.bestYoutubeTracklist({ description: '00:00 A - B\n03:00 C - D\n06:00 E - F', comments: [{ text: comment }] });
-  assert.equal(timed.from, 'beschrijving', 'lijst met tijden gaat voor');
+await test('verwijderde methode (YouTube-tracklist) in opgeslagen instellingen breekt niets', () => {
+  const s = effectiveSettings({ order: ['youtube', 'shazam', 'nafp'], methods: { youtube: { enabled: true, ytdlp: 'yt-dlp' }, shazam: { enabled: true } } });
+  assert.ok(!s.order.includes('youtube') && !('youtube' in s.methods));
+  assert.deepEqual(s.order.slice(0, 2), ['shazam', 'nafp']);
+  assert.ok(M.describe(s).every(d => d.id !== 'youtube'));
+  assert.deepEqual(createPipeline(s).active, ['Shazam']);
+});
+
+await test('MixesDB zonder tijden: regels "# Artiest - Titel" worden een lijst op volgorde', () => {
   assert.deepEqual(M.parseMixesdb('# Aberton - Me Out\n# Jonny Calypso - Teenager 2K15 [Label]\n# ?').map(t => [t.artist, t.title, t.start_sec]), [['Aberton', 'Me Out', undefined], ['Jonny Calypso', 'Teenager 2K15', undefined], ['', '?', undefined]]);
 });
 
-// ---- tracklist formats as people post them (YouTube description/comments/replies, other sites)
-const SAINTE_VIE = `Broken Glass (Helsloot Extended Remix) — Remate Claptone
-Aurora (Bondi Extended Remix) — Mick Pedaja, BONDI, Ornery, Raul Ojamaa
-Sunset Drive — Stereoclip
-No Rules — Notre Dame
-Flying Away With You (andhim Remix) — WhoMadeWho
-Don't Mind (Extended Mix) — Super Flu
-Where We Belong — Roman Kyn
-Feel So Right — Josh Gigante
-If Your Girl Only Knew — Fahlberg
-Hino (Andrea Oliva Remix) — Emanuel Satie, Maga, Rosbeh
-Just Wanna — Yet More
-Unconditional — Sainte Vie
-Get It Going (Extended Mix) — Dan Sushi
-Candy Cloud — Notre Dame
-Tres (Fahlberg Remix) — Sainte Vie
-I Wanna Go — Arodes
-Echoes of You — TH;EN
-Dreamer (feat. Ariana Celaeno) — Aalson
-At Least We Are Under The Same Moon — Raúl Vidal`;
-const pairs = (ts) => ts.map(t => [t.artist, t.title]);
-await test('tracklist-formaten: Sainte Vie-comment (em-dash, Titel — Artiest) wordt herkend en omgedraaid', () => {
-  const t = M.parseUntimedLines(SAINTE_VIE);
-  assert.equal(t.length, 19);
-  assert.deepEqual(pairs(t.slice(0, 2)), [['Remate Claptone', 'Broken Glass (Helsloot Extended Remix)'], ['Mick Pedaja, BONDI, Ornery, Raul Ojamaa', 'Aurora (Bondi Extended Remix)']]);
-  assert.deepEqual(pairs([t[5], t[6]]), [['Super Flu', "Don't Mind (Extended Mix)"], ['Roman Kyn', 'Where We Belong']]);
-  const best = M.bestYoutubeTracklist({ comments: [{ text: 'what a sunset 😍' }, { text: 'track at 41:30?' }, { text: SAINTE_VIE, like_count: 50 }] });
-  assert.equal(best.from, 'comment (zonder tijden)'); assert.equal(best.tracks.length, 19);
-});
-await test('tracklist-formaten: tijden in alle vormen, header, emoji, nummering, labels', () => {
-  const t = M.parseTimedLines('Tracklist:\n🔥 [00:00] Aberton - Me Out [Get Physical]\n2. (05:12) Jonny Calypso – Teenager 2K15\n08:00 - Victor Vera — Pressure (Daniel Sbert Remix)\n1:02:03 ID - ID 🔥\nDeco - New Day 1:10:00');
-  assert.deepEqual(t.map(x => [x.start_sec, x.artist, x.title, x.unknown]), [
-    [0, 'Aberton', 'Me Out', false], [312, 'Jonny Calypso', 'Teenager 2K15', false], [480, 'Victor Vera', 'Pressure (Daniel Sbert Remix)', false],
-    [3723, 'ID', 'ID', true], [4200, 'Deco', 'New Day', false]]);
-});
-await test('tracklist-formaten: | / tab, "by", zonder spaties, ???', () => {
-  assert.deepEqual(pairs(M.parseUntimedLines('01. Moderat | Bad Kingdom\n02. Kölsch | Grey\n03. Stephan Bodzin | Singularity\n04. Tale Of Us | Nova')),
-    [['Moderat', 'Bad Kingdom'], ['Kölsch', 'Grey'], ['Stephan Bodzin', 'Singularity'], ['Tale Of Us', 'Nova']]);
-  assert.deepEqual(pairs(M.parseUntimedLines('Bad Kingdom by Moderat\nGrey by Kölsch\nSingularity by Stephan Bodzin\nNova by Tale Of Us')).slice(0, 2), [['Moderat', 'Bad Kingdom'], ['Kölsch', 'Grey']]);
-  assert.deepEqual(pairs(M.parseUntimedLines('Moderat\tBad Kingdom\nKölsch\tGrey\nTale Of Us / Nova\nAfterlife - ???')),
-    [['Moderat', 'Bad Kingdom'], ['Kölsch', 'Grey'], ['Tale Of Us', 'Nova'], ['Afterlife', '???']]);
-  const t = M.parseUntimedLines('Jay-Z - Run This Town\nAdam Beyer-Your Mind\nCharlotte de Witte - Selected\nID - ID');
-  assert.deepEqual(pairs(t), [['Jay-Z', 'Run This Town'], ['Adam Beyer', 'Your Mind'], ['Charlotte de Witte', 'Selected'], ['ID', 'ID']]);
-  assert.equal(t[3].unknown, true);
-});
-await test('tracklist-formaten NEGATIEF: gewone comments worden geen tracklist', () => {
-  const none = (txt) => assert.deepEqual([M.parseUntimedLines(txt), M.parseTimedLines(txt)], [[], []], txt);
-  none('Love this set! Super Flu - Don\'t Mind is my favourite, played it 3 times');            // one mention
-  none('Moderat - Bad Kingdom\nKölsch - Grey\nTale Of Us - Nova');                              // only 3 lines
-  none('Amazing set - thanks!\nBest DJ - ever!\nWho else is here - in 2026?\nGreetings from Brazil - love you all!'); // chatter with dashes
-  none('First!\nWhat is the track at 41:30?\nNice - very nice\nThis is my opinion about the drop in the middle of the set and I think - honestly - it is the best one ever made by anyone'); // mixed chatter
-  none('Tracklist:\nThe whole set was amazing, thanks for uploading\n0:00 intro\nsee you next year');
-});
-await test('tracklist-formaten: verdeeld over comments van één persoon (part 1/2) en als reply', () => {
-  const info = { comments: [
-    { author_id: 'u1', timestamp: 1, text: 'Tracklist part 1/2:\nModerat - Bad Kingdom\nKölsch - Grey' },
-    { author_id: 'u2', timestamp: 2, text: 'thanks for the ID!' },
-    { author_id: 'u1', timestamp: 3, text: 'part 2/2:\nStephan Bodzin - Singularity\nTale Of Us - Nova\nMind Against - Atlant' },
-  ] };
-  const b = M.bestYoutubeTracklist(info);
-  assert.equal(b.from, 'comments van één persoon (zonder tijden)'); assert.equal(b.tracks.length, 5);
-  const r = M.bestYoutubeTracklist({ comments: [{ text: 'tracklist?' }, { parent: 'abc', text: '00:00 Moderat - Bad Kingdom\n04:10 Kölsch - Grey\n09:30 Tale Of Us - Nova' }] });
-  assert.equal(r.from, 'reply'); assert.equal(r.tracks[2].start_sec, 570);
-});
-await test('tracklist zonder tijden: oriëntatie ook via herkende tracks (orderFill probeert beide richtingen)', async () => {
-  const list = M.parseUntimedLines('Bad Kingdom - Moderat\nGrey - Kölsch\nSingularity - Stephan Bodzin\nNova - Tale Of Us'); // no text signals: stays as written
-  assert.equal(list[0].artist, 'Bad Kingdom');
+await test('lijst zonder tijden: oriëntatie via herkende tracks (orderFill probeert beide richtingen)', async () => {
+  // a list written "Title - Artist" (MixesDB reads it as Artist - Title)
+  const list = [['Bad Kingdom', 'Moderat'], ['Grey', 'Kölsch'], ['Singularity', 'Stephan Bodzin'], ['Nova', 'Tale Of Us']].map(([artist, title]) => ({ artist, title }));
   globalThis.fetch = async (url) => url.includes('list=search') ? jsonRes({ query: { search: [{ title: '2026-01-01 - Moderat @ Test Festival' }] } })
     : { text: async () => list.map(t => `# ${t.artist} - ${t.title}`).join('\n') };
   const p = createPipeline(settings({ shazam: { enabled: true }, mixesdb: { enabled: true } }, ['shazam', 'mixesdb']));

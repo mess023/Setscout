@@ -28,11 +28,17 @@ RUN curl -fsSL -o /tmp/ckpt.tar.gz "https://zenodo.org/api/records/15782389/file
     && find /opt/peaknetfp/ckpt -maxdepth 4 | head -40
 
 COPY nafp_worker.py /app/nafp_worker.py
-ENV PEAKNETFP_HOME=/opt/peaknetfp NAFP_DATA=/data/nafp NAFP_PORT=8099 TF_CPP_MIN_LOG_LEVEL=2 MPLBACKEND=Agg
+# librosa's numba functions are compiled with cache=True and by default write that cache next to their source in
+# site-packages — read-only for the non-root user TrueNAS runs apps as (568) → "cannot cache function". Writable
+# cache + HOME in /tmp.
+ENV PEAKNETFP_HOME=/opt/peaknetfp NAFP_DATA=/data/nafp NAFP_PORT=8099 TF_CPP_MIN_LOG_LEVEL=2 MPLBACKEND=Agg \
+    NUMBA_CACHE_DIR=/tmp/numba HOME=/tmp
 
 # Build-time functional test (synthetic audio, both models) — see selftest.sh
 COPY selftest.sh /app/selftest.sh
-RUN sh /app/selftest.sh
+# run the test as the same non-root user as on TrueNAS, with site-packages not writable for it (like in production)
+USER 568:568
+RUN test ! -w /usr/local/lib/python3.11/site-packages && sh /app/selftest.sh
 
 EXPOSE 8099
 CMD ["python", "/app/nafp_worker.py"]

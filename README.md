@@ -85,7 +85,6 @@ Gebruikte software; die zit **niet** in deze repo, maar wordt in de Docker-image
 | shazam-api (npm) | GPL-2.0 | https://www.npmjs.com/package/shazam-api |
 | audfprint | MIT | https://github.com/dpwe/audfprint |
 | Dejavu (bcollazo-fork, SQLite) | MIT | https://github.com/bcollazo/dejavu |
-| yt-dlp / Deno | Unlicense / MIT | https://github.com/yt-dlp/yt-dlp · https://github.com/denoland/deno |
 | Olaf | AGPL-3.0 | https://github.com/JorenSix/Olaf |
 | Panako | AGPL-3.0 | https://github.com/JorenSix/Panako |
 | Essentia | AGPL-3.0 | https://github.com/MTG/essentia |
