@@ -46,6 +46,22 @@ TrueNAS bewaart en start de compose-YAML zelf. Daarom werkt `docker compose --pr
 
 **Beveiliging:** poort 5555 (ADB) geeft volledige controle over de emulator. Open hem alleen tijdens het inloggen, of alleen op je LAN. Setscout zelf praat met de emulator via het interne compose-netwerk (`android:5555`, `android:4713`).
 
+## Komt de audio aan? (TrueNAS-shell)
+
+Poort 4713 hoeft **niet** in `ports:`: setscout en android zitten in dezelfde app en praten over het interne netwerk (`android:4713`). `ports:` is alleen nodig voor verbindingen van búiten de NAS (zoals 5555 voor scrcpy).
+
+```
+# 1. PulseAudio draait, met TCP-module, null-sink en virtmic.monitor als standaardbron
+docker exec android pactl -s unix:/tmp/pulse.sock list short modules | grep -E "tcp|null-sink"
+docker exec android pactl -s unix:/tmp/pulse.sock info | grep "Default Source"
+# 2. De emulator neemt op van virtmic.monitor (moet een regel geven zolang de emulator draait)
+docker exec android pactl -s unix:/tmp/pulse.sock list source-outputs | grep -E "Source Output|source:|application.name"
+# 3. Testtoon vanuit setscout naar de virtuele microfoon (5 s); start in een tweede shell stap 4
+docker exec setscout sh -c 'ffmpeg -v error -y -f lavfi -i sine=f=440:d=5 -ac 1 -ar 16000 /tmp/t.wav && paplay --server=tcp:android:4713 --device=virtmic /tmp/t.wav && echo afgespeeld'
+# 4. Tijdens stap 3: er hoort een sink-input op virtmic te staan
+docker exec android pactl -s unix:/tmp/pulse.sock list short sink-inputs
+```
+
 ## Problemen
 
 | Symptoom in de log van `android` | Oplossing |

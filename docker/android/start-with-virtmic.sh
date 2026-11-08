@@ -16,7 +16,16 @@ if pulseaudio -D --exit-idle-time=-1 \
      --load="module-native-protocol-tcp port=4713 auth-anonymous=1"; then
   sleep 1
   pactl -s unix:/tmp/pulse.sock set-default-source virtmic.monitor || true
-  export PULSE_SERVER=unix:/tmp/pulse.sock QEMU_AUDIO_DRV=pa
+  # the emulator (QEMU) finds PulseAudio through these; QEMU_PA_SOURCE pins the recording source to virtmic
+  export PULSE_SERVER=unix:/tmp/pulse.sock QEMU_AUDIO_DRV=pa QEMU_PA_SOURCE=virtmic.monitor
+  # After boot, switch the AVD's "virtual microphone uses host audio input" on explicitly (it resets per start).
+  ( for i in $(seq 1 120); do
+      if adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | grep -q 1; then
+        adb -s emulator-5554 emu avd hostmicon >/dev/null 2>&1 && echo "setscout: host-microfoon aan (virtmic)" >&2
+        break
+      fi
+      sleep 5
+    done ) &
 else
   echo "setscout: PulseAudio start mislukt — emulator start zonder virtuele microfoon" >&2
 fi
