@@ -397,14 +397,26 @@ await test('Google: versies op de resultatenpagina als hint (niet automatisch ge
   assert.equal(M.parseSoundSearch(srp('LINDO PROVIBE Gauteng'), cfg).versions.length, 0);
 });
 
-await test('Google: oud resultaat van het vorige fragment wordt niet als nieuw gelezen', async () => {
-  const screens = [srp('LINDO PROVIBE Gauteng'), srp('LINDO PROVIBE Gauteng'), srp('LINDO PROVIBE Gauteng'), srp('Booka Shade Broken Glass', '<node content-desc="Booka Shade - Topic" text=""/>')];
-  let d = 0;
-  api.run = async (cmd, args) => ({ code: 0, stdout: args.includes('uiautomator') ? screens[Math.min(d++, screens.length - 1)] : '', stderr: '' });
-  const cfg = { ...effectiveSettings().methods.google, adb: 'package.json', paplay: 'package.json', waitSec: 30 };
-  const r = await byId.google.recognize({ ...ctx(), wav: () => 'f.wav' }, cfg);
-  assert.deepEqual([r.artist, r.title], ['Booka Shade', 'Broken Glass']);
-  assert.equal(d, 4, 'nulmeting + 2 keer het oude scherm overgeslagen + het nieuwe');
+await test('Google: zelfde titel op opeenvolgende fragmenten telt; resultaat pas na luisterscherm; geen nieuwe herkenning = fout', async () => {
+  const listening = '<hierarchy><node text="Listening…" resource-id="x:id/status"/></hierarchy>';
+  const booka = srp('Booka Shade Broken Glass', '<node content-desc="Booka Shade - Topic" text=""/>');
+  const base = { ...effectiveSettings().methods.google, adb: 'package.json', paplay: 'package.json', waitSec: 30 };
+  const run = (screens, cfg = base) => {
+    let d = 0;
+    api.run = async (cmd, args) => ({ code: 0, stdout: args.includes('uiautomator') ? screens[Math.min(d++, screens.length - 1)] : '', stderr: '' });
+    return byId.google.recognize({ ...ctx(), wav: () => 'f.wav' }, cfg);
+  };
+  // two fragments of the same track: both give the same (correct) result — no title comparison
+  for (let i = 0; i < 2; i++) {
+    const r = await run([listening, booka]);
+    assert.deepEqual([r.artist, r.title], ['Booka Shade', 'Broken Glass']);
+  }
+  // an old results page at the start is skipped until the listening screen appeared; after that any result counts
+  assert.equal((await run([srp('LINDO PROVIBE Gauteng'), listening, srp('LINDO PROVIBE Gauteng')])).title, 'LINDO PROVIBE Gauteng');
+  // the listening screen never appears (old page stays): no new recognition → error instead of the old title
+  await assert.rejects(run([srp('LINDO PROVIBE Gauteng')], { ...base, waitSec: 0 }), /geen nieuwe herkenning/);
+  // listening but nothing recognised within the wait time → "geen resultaat"
+  await assert.rejects(run([listening], { ...base, waitSec: 0 }), /geen resultaat op het scherm/);
 });
 
 await test('Google: geen resultaat → fout met zichtbare teksten (voor afstellen); paplay-fout netjes', async () => {
