@@ -148,8 +148,16 @@ await test('audfprint parser (dpwe-uitvoer)', () => {
 await test('Panako parser (;-gescheiden, header overgeslagen)', () => {
   assert.deepEqual(parse('panako', 'Index;Total;Query path;Query start;Query stop;Match path;Match id;Match start;Match stop;Match score;Time factor (%);Freq factor (%);Seconds with match (%)\n1;1;q.wav;0;18;/music/d.flac;99;60;78;37;101;100;80'), { path: '/music/d.flac', score: 37, offset: 60 });
 });
-await test('Dejavu parser (Python-dict)', () => {
-  assert.deepEqual(parse('dejavu', "{'results': [{'song_id': 1, 'song_name': b'Artist - Song', 'input_confidence': 0.42, 'offset_seconds': 12.5}]}"), { path: 'Artist - Song', score: 0.42, offset: 12.5 });
+await test('Dejavu: wrapper-JSON parser + aanroepen (SQLite-index in data/index/dejavu)', () => {
+  assert.deepEqual(parse('dejavu', 'some log line\n{"path": "/music/A - B.mp3", "confidence": 42, "offset": 12.5}'), { path: '/music/A - B.mp3', score: 42, offset: 12.5 });
+  assert.equal(parse('dejavu', 'null'), null);
+  assert.equal(parse('dejavu', 'Traceback (most recent call last):'), null);
+  const cfg = { ...effectiveSettings().methods.dejavu, python: 'package.json' };
+  const [, qa, env] = byId.dejavu.local.query('frag.wav', cfg);
+  assert.deepEqual(qa.slice(1, 2).concat(qa.slice(3)), ['query', 'frag.wav']);
+  assert.match(qa[0], /tools[\\/]dejavu_cli\.py$/); assert.match(qa[2], /index[\\/]dejavu[\\/]dejavu\.sqlite$/);
+  assert.equal(env.MPLBACKEND, 'Agg');
+  assert.deepEqual(byId.dejavu.local.index(['a.mp3', 'b.mp3'], cfg)[1].slice(1, 2).concat(byId.dejavu.local.index(['a.mp3', 'b.mp3'], cfg)[1].slice(3)), ['index', 'a.mp3', 'b.mp3']);
 });
 
 await test('Olaf via keten: index → query (gemockt) → tags uit bestandsnaam, drempel', async () => {

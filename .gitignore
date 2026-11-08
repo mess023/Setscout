@@ -27,3 +27,4 @@ data/
 *.cue
 *_tracklist.*
 *tracklist.csv
+!tools/dejavu_cli.py
