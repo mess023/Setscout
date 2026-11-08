@@ -580,8 +580,7 @@ let cfg = null;            // /api/methods payload
 const openCards = new Set();
 const ST_LABEL = { ok: 'Klaar', key: 'Sleutel ontbreekt', tool: 'Niet geïnstalleerd', index: 'Index leeg', na: 'Niet mogelijk' };
 const GROUPS = [
-  ['recognize', 'Herkenningsketen', 'Per fragment probeert Setscout de actieve methodes van boven naar beneden; de eerste die een track vindt, wint. Sleep aan ⋮⋮ (of pijltjestoetsen) om de volgorde te wijzigen.'],
-  ['reference', 'Referentie-tracklists', 'Halen na de scan een bestaande tracklist van de hele set op en vullen daarmee alleen fragmenten die de keten niet herkende (op tijdstip). Volgorde telt onderling.'],
+  ['chain', 'Herkenningsketen', 'Per fragment probeert Setscout de actieve methodes van boven naar beneden; de eerste die een track vindt, wint. Ook tracklists (Referentie) kunnen overal staan: bovenaan wordt de tracklist eerst overgenomen en gaan alleen "ID"-tracks en stukken zonder cue naar de methodes eronder; onderaan vult hij alleen wat de rest niet vond. Sleep aan ⋮⋮ (of pijltjestoetsen) om de volgorde te wijzigen.'],
   ['enrich', 'Verrijking', 'Herkennen zelf niets: voegen metadata of analyse toe aan elke gevonden track.'],
   ['none', 'Niet mogelijk (nu)', 'Onderzocht maar niet te bouwen zonder eigen werk of hardware; reden in de tooltip.'],
 ];
@@ -600,7 +599,8 @@ async function saveSettings(patch, rerender = true) {
   toast('Opgeslagen');
   return true;
 }
-const chain = () => cfg ? cfg.methods.filter(m => m.group === 'recognize' && m.values.enabled) : [];
+const inChain = (m) => m.group === 'recognize' || m.group === 'reference';
+const chain = () => cfg ? cfg.methods.filter(m => inChain(m) && m.values.enabled) : [];
 function renderChainPill() {
   const p = $('chain-pill'); if (!p || !cfg) return;
   const on = chain(), ready = on.filter(m => m.state === 'ok');
@@ -627,7 +627,7 @@ function cardHtml(m, pos) {
   const on = m.values.enabled, open = openCards.has(m.id);
   return `<div class="mcard ${on ? '' : 'off'}" data-id="${m.id}">
     <button class="grip" aria-label="Verplaats ${esc(m.label)}" title="Sleep om de volgorde te wijzigen (of focus en ↑/↓)">⋮⋮</button>
-    <span class="pos" title="${on ? 'Positie in de keten' : 'Uit'}">${on && m.group === 'recognize' ? pos : ''}</span>
+    <span class="pos" title="${on ? 'Positie in de keten' : 'Uit'}">${on && inChain(m) ? pos : ''}</span>
     <label class="switch" title="${on ? 'Aan — klik om uit te zetten' : 'Uit — klik om aan te zetten'}"><input type="checkbox" data-act="toggle" ${on ? 'checked' : ''} aria-label="${esc(m.label)} aan/uit"><i></i></label>
     <div class="mname"><b title="${esc(m.tip)}">${esc(m.label)}</b><span class="mtag" title="${m.local ? 'Fingerprint van je eigen muziekbestanden (index onder Collectie)' : m.kind === 'Cloud' ? 'Online dienst met eigen database; het fragment wordt geüpload' : esc(m.kind)}">${esc(m.kind)}</span></div>
     <span class="st ${m.state}" data-st="${m.id}" title="${esc(m.install || m.msg)}">${esc(m.msg)}</span>
@@ -641,9 +641,9 @@ function renderSettings() {
   if (!cfg) { el.innerHTML = '<div class="empty">Instellingen laden…</div>'; return; }
   let html = '';
   for (const [g, title, tip] of GROUPS) {
-    const list = cfg.methods.filter(m => m.group === g);
+    const list = cfg.methods.filter(m => g === 'chain' ? inChain(m) : m.group === g);
     let pos = 0;
-    html += `<h2><abbr title="${esc(tip)}">${title}</abbr>${g === 'recognize' ? `<small>${chain().length} actief</small>` : ''}</h2>
+    html += `<h2><abbr title="${esc(tip)}">${title}</abbr>${g === 'chain' ? `<small>${chain().length} actief</small>` : ''}</h2>
       <div class="mlist" data-group="${g}">${list.map(m => cardHtml(m, m.values.enabled ? ++pos : 0)).join('')}</div>`;
   }
   const c = cfg.collection;
@@ -718,6 +718,7 @@ sb.addEventListener('click', (e) => {
 
 // drag & drop ordering (within one group), plus ↑/↓ on the focused grip
 let dragEl = null;
+let orderTimer;
 const saveOrder = () => saveSettings({ order: [...sb.querySelectorAll('.mcard')].map(c => c.dataset.id) });
 sb.addEventListener('mousedown', (e) => { const c = e.target.closest('.grip')?.closest('.mcard'); if (c) c.draggable = true; });
 sb.addEventListener('dragstart', (e) => { dragEl = e.target.closest('.mcard'); dragEl?.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
@@ -737,7 +738,7 @@ sb.addEventListener('keydown', (e) => {
   if (!sib) return;
   c.parentNode.insertBefore(c, e.key === 'ArrowUp' ? sib : sib.nextSibling);
   g.focus(); // moving the node drops focus; keep it so repeated ↑/↓ keeps working
-  saveOrder();
+  clearTimeout(orderTimer); orderTimer = setTimeout(saveOrder, 500); // one save per burst of presses: a re-render from an older save would undo newer moves
 });
 
 // collection index (SSE)

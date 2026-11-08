@@ -185,17 +185,41 @@ await test('referentie: trackid.dev vult alleen gaten, op tijdstip', async () =>
   assert.equal(segs[0].match.title, 'Shz');
   assert.equal(segs[1].match.title, 'Een'); assert.equal(segs[2].match.title, 'Twee');
   assert.equal(segs[2].match.method, 'trackid.dev');
-  assert.deepEqual(await p.fillGaps('geen-id.mp3', [{ pos: 0, match: null }]), [{ method: 'trackid.dev', error: 'geen YouTube-ID in de bestandsnaam' }]);
+  const p2 = createPipeline(settings({ shazam: { enabled: true }, trackid: { enabled: true } })); // one pipeline = one scan/file
+  assert.deepEqual(await p2.fillGaps('geen-id.mp3', [{ pos: 0, match: null }]), [{ method: 'trackid.dev', error: 'geen YouTube-ID in de bestandsnaam' }]);
 });
 
 await test('referentie: 1001Tracklists parse + nette fout bij blokkade', async () => {
   const page = `<div class="tlpItem x"><meta itemprop="name" content="Artist One - Song &amp; Co"><div class="cueValueField">01:02:03</div></div>
-    <div class="tlpItem"><meta itemprop="name" content="Two - B"><div class="cueValueField"> 05:00</div></div>`;
+    <div class="tlpItem"><meta itemprop="name" content="Two - B"><div class="cueValueField"> 05:00</div></div>
+    <div class="tlpItem"><meta itemprop="name" content="ID - ID"><div class="cueValueField">08:00</div></div>`;
   globalThis.fetch = async (url) => ({ text: async () => url.includes('/search/') ? '<a href="/tracklist/abc/set.html">x</a>' : page });
   const list = await byId['1001tl'].tracklist('My Set [AbCdEfGhIjK].webm', {});
-  assert.deepEqual(list, [{ start_sec: 3723, artist: 'Artist One', title: 'Song & Co' }, { start_sec: 300, artist: 'Two', title: 'B' }]);
+  assert.deepEqual(list, [{ start_sec: 3723, artist: 'Artist One', title: 'Song & Co', unknown: false }, { start_sec: 300, artist: 'Two', title: 'B', unknown: false }, { start_sec: 480, artist: 'ID', title: 'ID', unknown: true }]);
   globalThis.fetch = async () => ({ text: async () => 'Please wait, you will be forwarded' });
   await assert.rejects(byId['1001tl'].tracklist('x.mp3', {}), /geblokkeerd/);
+});
+
+await test('keten: tracklist bovenaan → eerst overgenomen, Shazam alleen voor ID/vóór eerste cue; Van = cue', async () => {
+  const page = ['01:00|A - Een', '03:00|ID - ID', '05:00|B - Twee'].map(r => { const [c, n] = r.split('|'); return `<div class="tlpItem"><meta itemprop="name" content="${n}"><div class="cueValueField">${c}</div></div>`; }).join('');
+  let fetches = 0;
+  globalThis.fetch = async (url) => { fetches++; return { text: async () => url.includes('/search/') ? '<a href="/tracklist/x/set.html">x</a>' : page }; };
+  const shazamAt = [];
+  api.shazam = async () => { shazamAt.push(cur); return { artist: 'S', title: 'Shazam-vondst' }; };
+  let cur;
+  const p = createPipeline(settings({ shazam: { enabled: true }, '1001tl': { enabled: true } }, ['1001tl', 'shazam']));
+  assert.deepEqual(p.active, ['1001Tracklists', 'Shazam']);
+  const segs = [];
+  for (const pos of [0, 60, 90, 180, 240, 300, 330]) {
+    cur = pos;
+    segs.push({ pos, match: await p.recognize({ ...ctx(), pos, file: 'My Set.mp3' }) });
+    assert.equal(p.pause(), shazamAt.at(-1) === pos ? 3000 : 0, 'alleen pauze na een Shazam-call');
+  }
+  assert.deepEqual(shazamAt, [0, 180, 240], 'Shazam alleen vóór de eerste cue en in het ID-blok');
+  assert.equal(fetches, 2, 'tracklist één keer opgehaald');
+  const r = toRanges(segs, 12, 30);
+  assert.deepEqual(r.map(t => [t.title, t.method, t.start_sec, t.exact]),
+    [['Shazam-vondst', 'Shazam', 0, false], ['Een', '1001Tracklists', 60, true], ['Shazam-vondst', 'Shazam', 180, false], ['Twee', '1001Tracklists', 300, true]]);
 });
 
 await test('verrijking: MusicBrainz vult isrc/album aan, één keer per track (cache)', async () => {
